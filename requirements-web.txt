@@ -1,0 +1,2 @@
+# Dashboard Web - Dependencias para Render
+aiohttp>=3.8.0

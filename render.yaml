@@ -1,0 +1,13 @@
+# render.yaml - Config para deploy no Render.com
+services:
+  - type: web
+    name: sol-trading-dashboard
+    runtime: python
+    buildCommand: pip install -r requirements-web.txt
+    startCommand: python web_dashboard.py
+    plan: free
+    envVars:
+      - key: DASHBOARD_API_KEY
+        value: sol-trading-2026
+      - key: PORT
+        value: 10000

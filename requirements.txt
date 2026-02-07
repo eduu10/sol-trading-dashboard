@@ -1,0 +1,22 @@
+# Solana DEX Trading Bot - Dependencies
+# ======================================
+# Instale com: pip install -r requirements.txt
+
+# Telegram
+python-telegram-bot>=20.0
+httpx>=0.24.0
+
+# Solana Blockchain
+solana>=0.32.0
+solders>=0.20.0
+
+# Dados e Análise
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Async
+aiohttp>=3.8.0
+asyncio-mqtt>=0.16.0
+
+# Utilitários
+python-dotenv>=1.0.0
