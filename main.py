@@ -36,6 +36,7 @@ from jupiter_executor import JupiterExecutor
 from dashboard import DashboardServer
 from learning_engine import LearningEngine
 from strategies_manager import StrategiesManager
+from wallet_monitor import WalletMonitor
 
 # ============================================================
 # LOGGING
@@ -108,6 +109,12 @@ class TelegramBot:
 
         # Estrategias de teste (5 variacoes de day trade)
         self.strategies = StrategiesManager()
+
+        # Monitor de carteira Phantom (read-only)
+        self.wallet = WalletMonitor(
+            wallet_address=config.SOLANA_WALLET_ADDRESS,
+            rpc_url=config.SOLANA_RPC_URL,
+        ) if config.SOLANA_WALLET_ADDRESS else None
 
     # --------------------------------------------------------
     # TELEGRAM API
@@ -472,6 +479,24 @@ class TelegramBot:
                 f"⏰ {now_br().strftime('%H:%M - %d/%m/%Y')}\n"
             )
 
+            # Envia saldo da carteira Phantom
+            if self.wallet and wallet_data.get("connected"):
+                sol_bal = wallet_data.get("sol_balance", 0)
+                usdc_bal = wallet_data.get("usdc_balance", 0)
+                sol_usd = sol_bal * current_price if current_price > 0 else 0
+                total_usd = sol_usd + usdc_bal
+                addr_short = wallet_data.get("address_short", "")
+                await self.send_message(
+                    f"👛 *CARTEIRA PHANTOM*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🔑 `{addr_short}`\n"
+                    f"◎ SOL: *{sol_bal:.4f}* (~${sol_usd:,.2f})\n"
+                    f"💵 USDC: *${usdc_bal:,.2f}*\n"
+                    f"💎 Total: *${total_usd:,.2f}*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📖 Modo: Somente leitura"
+                )
+
             # Envia resumo das estrategias de teste
             try:
                 strats = self.strategies.get_all_dashboard_data()
@@ -714,6 +739,14 @@ class TelegramBot:
         except Exception as e:
             logger.debug(f"Strategies simulation error: {e}")
 
+        # Atualiza saldo da carteira Phantom (read-only)
+        wallet_data = {}
+        if self.wallet:
+            try:
+                wallet_data = await self.wallet.update_balances()
+            except Exception as e:
+                logger.debug(f"Wallet update error: {e}")
+
         # Push para dashboard na nuvem
         try:
             dashboard = self.executor.get_dashboard_data(current_price)
@@ -759,6 +792,7 @@ class TelegramBot:
                 },
                 "analysis_history": self.analysis_history[-20:],
                 "strategies": self.strategies.get_all_dashboard_data(),
+                "wallet": wallet_data,
             }
             await push_to_cloud(cloud_data)
         except Exception as e:

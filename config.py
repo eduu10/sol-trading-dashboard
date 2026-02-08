@@ -14,7 +14,8 @@ AUTHORIZED_USERS = []            # Lista de user IDs autorizados
 # ============================================================
 # SOLANA
 # ============================================================
-SOLANA_PRIVATE_KEY = ""           # Private key Base58 (só para trades reais)
+SOLANA_WALLET_ADDRESS = "AMg37YRKSJN68tpxpPtGm3BdVkd7Zg2zjLD6B5GDy9gi"  # Endereço público (Phantom)
+SOLANA_PRIVATE_KEY = ""           # Private key Base58 (só para trades reais - NÃO compartilhe!)
 SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com"
 
 # ============================================================

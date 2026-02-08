@@ -315,6 +315,18 @@ def get_dashboard_html():
         .log-warn { color: var(--yellow); }
         .footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.75em; border-top: 1px solid var(--border-color); margin-top: 16px; }
         /* ===== STRATEGY PANELS ===== */
+        .wallet-card { grid-column: 1 / 4; }
+        .wallet-inner { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+        .wallet-status { display: flex; align-items: center; gap: 8px; }
+        .wallet-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+        .wallet-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); }
+        .wallet-addr { font-family: 'JetBrains Mono', monospace; font-size: 0.8em; color: var(--text-secondary); background: rgba(255,255,255,0.04); padding: 4px 10px; border-radius: 6px; }
+        .wallet-balances { display: flex; gap: 28px; flex-wrap: wrap; }
+        .wallet-bal { text-align: center; }
+        .wallet-bal-label { font-size: 0.65em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+        .wallet-bal-value { font-family: 'JetBrains Mono', monospace; font-size: 1.1em; font-weight: 700; }
+        .wallet-bal-sub { font-size: 0.65em; color: var(--text-muted); margin-top: 2px; }
+        .wallet-readonly { font-size: 0.65em; color: var(--text-muted); background: rgba(255,255,255,0.04); padding: 3px 8px; border-radius: 4px; margin-left: auto; }
         .strategies-section { grid-column: 1 / 4; }
         .strategies-title-row { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
         .strategies-title { font-size: 1.1em; font-weight: 700; letter-spacing: -0.3px; }
@@ -398,14 +410,17 @@ def get_dashboard_html():
             .indicators-card { grid-column: 1 / 2; }
             .signals-card { grid-column: 2 / 3; }
             .price-card, .pnl-card, .status-card { grid-column: auto; }
-            .strategies-section { grid-column: 1 / 3; }
+            .wallet-card, .strategies-section { grid-column: 1 / 3; }
             .strategies-grid { grid-template-columns: repeat(3, 1fr); }
         }
         @media (max-width: 768px) {
             .main { grid-template-columns: 1fr; padding: 12px; }
             .chart-card, .indicators-card, .signals-card, .positions-card, .log-card, .analysis-card,
             .price-card, .pnl-card, .status-card { grid-column: 1 / 2; }
-            .strategies-section { grid-column: 1 / 2; }
+            .wallet-card, .strategies-section { grid-column: 1 / 2; }
+            .wallet-inner { gap: 12px; }
+            .wallet-balances { gap: 16px; }
+            .wallet-readonly { margin-left: 0; }
             .strategies-grid { grid-template-columns: 1fr 1fr; }
             .price-main { font-size: 2.2em; }
             .header { padding: 14px 16px; }
@@ -497,6 +512,19 @@ def get_dashboard_html():
             <div class="card-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg> Historico de Analises</div>
             <div class="analysis-list" id="analysis-list">
                 <div class="analysis-empty">Aguardando analises do bot...</div>
+            </div>
+        </div>
+        <!-- ===== CARTEIRA PHANTOM ===== -->
+        <div class="card wallet-card" id="wallet-card" style="display:none">
+            <div class="card-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="16" cy="12" r="2"/><path d="M2 10h4"/></svg> Carteira Phantom</div>
+            <div class="wallet-inner">
+                <div class="wallet-status"><div class="wallet-dot" id="wallet-dot"></div><span class="wallet-addr" id="wallet-addr">----...----</span></div>
+                <div class="wallet-balances">
+                    <div class="wallet-bal"><div class="wallet-bal-label">SOL</div><div class="wallet-bal-value" id="wallet-sol" style="color:var(--purple)">0.0000</div><div class="wallet-bal-sub" id="wallet-sol-usd">~$0.00</div></div>
+                    <div class="wallet-bal"><div class="wallet-bal-label">USDC</div><div class="wallet-bal-value" id="wallet-usdc" style="color:var(--green)">$0.00</div></div>
+                    <div class="wallet-bal"><div class="wallet-bal-label">Total</div><div class="wallet-bal-value" id="wallet-total" style="color:var(--yellow)">$0.00</div></div>
+                </div>
+                <div class="wallet-readonly">Somente leitura</div>
             </div>
         </div>
         <!-- ===== 5 ESTRATEGIAS DE DAY TRADE ===== -->
@@ -782,6 +810,17 @@ function updateDashboard(data) {
         const c=document.getElementById('log-container');c.innerHTML=lh;c.scrollTop=c.scrollHeight;}
     if(data.analysis_history&&data.analysis_history.length>0){renderAnalysisHistory(data.analysis_history);}
     if(data.strategies){updateStrategies(data.strategies);}
+    if(data.wallet&&data.wallet.connected){
+        const wc=document.getElementById('wallet-card');wc.style.display='';
+        const wd=document.getElementById('wallet-dot');wd.className='wallet-dot connected';
+        document.getElementById('wallet-addr').textContent=data.wallet.address_short||'';
+        const sol=data.wallet.sol_balance||0;const usdc=data.wallet.usdc_balance||0;
+        document.getElementById('wallet-sol').textContent=sol.toFixed(4);
+        const solUsd=sol*(data.price||0);
+        document.getElementById('wallet-sol-usd').textContent='~$'+solUsd.toFixed(2);
+        document.getElementById('wallet-usdc').textContent='$'+usdc.toFixed(2);
+        document.getElementById('wallet-total').textContent='$'+(solUsd+usdc).toFixed(2);
+    }
 }
 function updateStrategies(strats){
     function setCap(prefix,cap){

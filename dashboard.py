@@ -536,6 +536,19 @@ DASHBOARD_HTML = r"""
             border-top: 1px solid var(--border-color);
             margin-top: 16px;
         }
+        /* ===== WALLET CARD ===== */
+        .wallet-card { grid-column: 1 / 4; }
+        .wallet-inner { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+        .wallet-status { display: flex; align-items: center; gap: 8px; }
+        .wallet-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+        .wallet-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); }
+        .wallet-addr { font-family: 'JetBrains Mono', monospace; font-size: 0.8em; color: var(--text-secondary); background: rgba(255,255,255,0.04); padding: 4px 10px; border-radius: 6px; }
+        .wallet-balances { display: flex; gap: 28px; flex-wrap: wrap; }
+        .wallet-bal { text-align: center; }
+        .wallet-bal-label { font-size: 0.65em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+        .wallet-bal-value { font-family: 'JetBrains Mono', monospace; font-size: 1.1em; font-weight: 700; }
+        .wallet-bal-sub { font-size: 0.65em; color: var(--text-muted); margin-top: 2px; }
+        .wallet-readonly { font-size: 0.65em; color: var(--text-muted); background: rgba(255,255,255,0.04); padding: 3px 8px; border-radius: 4px; margin-left: auto; }
         /* ===== STRATEGY PANELS ===== */
         .strategies-section { grid-column: 1 / 4; }
         .strategies-title-row { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
@@ -599,7 +612,7 @@ DASHBOARD_HTML = r"""
             .positions-card { grid-column: 1 / 3; }
             .log-card { grid-column: 1 / 3; }
             .price-card, .pnl-card, .status-card { grid-column: auto; }
-            .strategies-section { grid-column: 1 / 3; }
+            .wallet-card, .strategies-section { grid-column: 1 / 3; }
             .strategies-grid { grid-template-columns: repeat(3, 1fr); }
         }
         @media (max-width: 768px) {
@@ -610,7 +623,10 @@ DASHBOARD_HTML = r"""
             .chart-card, .indicators-card, .signals-card,
             .positions-card, .log-card,
             .price-card, .pnl-card, .status-card { grid-column: 1 / 2; }
-            .strategies-section { grid-column: 1 / 2; }
+            .wallet-card, .strategies-section { grid-column: 1 / 2; }
+            .wallet-inner { gap: 12px; }
+            .wallet-balances { gap: 16px; }
+            .wallet-readonly { margin-left: 0; }
             .strategies-grid { grid-template-columns: 1fr 1fr; }
             .price-main { font-size: 2.2em; }
             .header { padding: 14px 16px; }
@@ -817,6 +833,19 @@ DASHBOARD_HTML = r"""
             </div>
         </div>
 
+        <!-- ===== CARTEIRA PHANTOM ===== -->
+        <div class="card wallet-card" id="wallet-card" style="display:none">
+            <div class="card-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="16" cy="12" r="2"/><path d="M2 10h4"/></svg> Carteira Phantom</div>
+            <div class="wallet-inner">
+                <div class="wallet-status"><div class="wallet-dot" id="wallet-dot"></div><span class="wallet-addr" id="wallet-addr">----...----</span></div>
+                <div class="wallet-balances">
+                    <div class="wallet-bal"><div class="wallet-bal-label">SOL</div><div class="wallet-bal-value" id="wallet-sol" style="color:var(--purple)">0.0000</div><div class="wallet-bal-sub" id="wallet-sol-usd">~$0.00</div></div>
+                    <div class="wallet-bal"><div class="wallet-bal-label">USDC</div><div class="wallet-bal-value" id="wallet-usdc" style="color:var(--green)">$0.00</div></div>
+                    <div class="wallet-bal"><div class="wallet-bal-label">Total</div><div class="wallet-bal-value" id="wallet-total" style="color:var(--yellow)">$0.00</div></div>
+                </div>
+                <div class="wallet-readonly">Somente leitura</div>
+            </div>
+        </div>
         <!-- ===== 5 ESTRATEGIAS DE DAY TRADE ===== -->
         <div class="strategies-section">
             <div class="strategies-title-row">
@@ -1114,6 +1143,19 @@ function updateDashboard(data) {
         const container = document.getElementById('log-container');
         container.innerHTML = logHtml;
         container.scrollTop = container.scrollHeight;
+    }
+
+    // Wallet
+    if(data.wallet&&data.wallet.connected){
+        const wc=document.getElementById('wallet-card');wc.style.display='';
+        const wd=document.getElementById('wallet-dot');wd.className='wallet-dot connected';
+        document.getElementById('wallet-addr').textContent=data.wallet.address_short||'';
+        const sol=data.wallet.sol_balance||0;const usdc=data.wallet.usdc_balance||0;
+        document.getElementById('wallet-sol').textContent=sol.toFixed(4);
+        const solUsd=sol*(data.price||0);
+        document.getElementById('wallet-sol-usd').textContent='~$'+solUsd.toFixed(2);
+        document.getElementById('wallet-usdc').textContent='$'+usdc.toFixed(2);
+        document.getElementById('wallet-total').textContent='$'+(solUsd+usdc).toFixed(2);
     }
 
     // Strategies
@@ -1450,6 +1492,7 @@ class DashboardServer:
             "last_signal": last_signal,
             "logs": self.logs[-30:],
             "strategies": self.bot.strategies.get_all_dashboard_data() if hasattr(self.bot, 'strategies') else {},
+            "wallet": self.bot.wallet.get_data() if hasattr(self.bot, 'wallet') and self.bot.wallet else {},
         }
 
     async def handle_status(self, request):
