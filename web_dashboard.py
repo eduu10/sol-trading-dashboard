@@ -10,12 +10,24 @@ Deploy: Render.com (gratis)
 import os
 import json
 import time
+import hashlib
+import secrets
 from datetime import datetime
 from aiohttp import web
 import asyncio
 import logging
 
 logger = logging.getLogger("WebDashboard")
+
+# ============================================================
+# AUTENTICACAO
+# ============================================================
+AUTH_USER = os.environ.get("DASH_USER", "claudinhoadm1n")
+AUTH_PASS_HASH = hashlib.sha256(
+    os.environ.get("DASH_PASS", "deger1266cabuloso").encode()
+).hexdigest()
+SESSIONS = {}  # token -> {"user": str, "created": float}
+SESSION_MAX_AGE = 86400 * 7  # 7 dias
 
 # Dados compartilhados (in-memory)
 BOT_DATA = {
@@ -605,6 +617,9 @@ def get_dashboard_html():
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
             </button>
             <span class="mode-badge mode-paper" id="mode-badge">PAPER</span>
+            <a href="/logout" class="settings-btn" title="Sair" style="text-decoration:none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            </a>
         </div>
     </header>
     <main class="main">
@@ -993,6 +1008,7 @@ function updateChartLegend() { const legend = document.getElementById('chart-leg
 async function pollData() {
     try {
         const r = await fetch('/api/data');
+        if(r.status===401){window.location.href='/login';return;}
         const data = await r.json();
         if (data.price > 0) {
             updateDashboard(data);
@@ -1436,14 +1452,147 @@ async function saveSettings(){
 
 
 # ============================================================
+# LOGIN PAGE HTML
+# ============================================================
+def get_login_html(error=""):
+    err_html = f'<div class="login-error">{error}</div>' if error else ''
+    return r"""
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login - SOL/USDC Trading Bot</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0f;--card:#161622;--border:rgba(255,255,255,0.06);--green:#00ff88;--purple:#aa66ff;--blue:#4488ff;--red:#ff4466;--text:#fff;--muted:#555566;--secondary:#8888aa;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;}
+body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at 20% 50%,rgba(0,255,136,0.03) 0%,transparent 50%),radial-gradient(ellipse at 80% 20%,rgba(68,136,255,0.03) 0%,transparent 50%),radial-gradient(ellipse at 50% 80%,rgba(170,102,255,0.02) 0%,transparent 50%);pointer-events:none;z-index:0;}
+.login-box{position:relative;z-index:1;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:48px 40px;width:400px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,0.5);}
+.login-logo{width:56px;height:56px;background:linear-gradient(135deg,var(--green),var(--blue));border-radius:16px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:24px;margin:0 auto 24px;box-shadow:0 0 30px rgba(0,255,136,0.3);}
+.login-title{text-align:center;font-size:1.4em;font-weight:700;margin-bottom:8px;}
+.login-sub{text-align:center;font-size:0.85em;color:var(--secondary);margin-bottom:32px;}
+.login-field{margin-bottom:18px;}
+.login-label{display:block;font-size:0.75em;font-weight:600;color:var(--secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
+.login-input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:13px 16px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:0.9em;transition:border-color 0.2s;}
+.login-input:focus{outline:none;border-color:var(--purple);}
+.login-input::placeholder{color:var(--muted);}
+.login-btn{width:100%;padding:14px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--green),var(--blue));color:#0a0a0f;font-size:0.95em;font-weight:700;cursor:pointer;transition:opacity 0.2s,transform 0.1s;margin-top:8px;letter-spacing:0.5px;}
+.login-btn:hover{opacity:0.9;}
+.login-btn:active{transform:scale(0.98);}
+.login-error{background:rgba(255,68,102,0.1);color:var(--red);border:1px solid rgba(255,68,102,0.2);border-radius:8px;padding:10px;text-align:center;font-size:0.8em;margin-bottom:16px;}
+.login-footer{text-align:center;margin-top:24px;font-size:0.7em;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="login-box">
+<div class="login-logo">S</div>
+<div class="login-title">SOL/USDC Trading Bot</div>
+<div class="login-sub">Acesso restrito ao painel de controle</div>
+""" + err_html + r"""
+<form method="POST" action="/login">
+<div class="login-field">
+<label class="login-label">Usuario</label>
+<input class="login-input" type="text" name="username" placeholder="Seu usuario" required autocomplete="username">
+</div>
+<div class="login-field">
+<label class="login-label">Senha</label>
+<input class="login-input" type="password" name="password" placeholder="Sua senha" required autocomplete="current-password">
+</div>
+<button class="login-btn" type="submit">Entrar</button>
+</form>
+<div class="login-footer">Powered by Jupiter DEX + GeckoTerminal</div>
+</div>
+</body>
+</html>
+"""
+
+
+def check_session(request):
+    """Verifica se o request tem sessao valida. Retorna True/False."""
+    token = request.cookies.get("session")
+    if not token:
+        return False
+    sess = SESSIONS.get(token)
+    if not sess:
+        return False
+    if time.time() - sess["created"] > SESSION_MAX_AGE:
+        SESSIONS.pop(token, None)
+        return False
+    return True
+
+
+def require_auth(handler):
+    """Decorator: redireciona para /login se nao autenticado."""
+    async def wrapper(request):
+        if not check_session(request):
+            raise web.HTTPFound("/login")
+        return await handler(request)
+    return wrapper
+
+
+def require_auth_api(handler):
+    """Decorator: retorna 401 JSON se nao autenticado (para API calls do frontend)."""
+    async def wrapper(request):
+        if not check_session(request):
+            return web.json_response({"error": "unauthorized"}, status=401)
+        return await handler(request)
+    return wrapper
+
+
+# ============================================================
 # ROUTES
 # ============================================================
+async def handle_login_page(request):
+    """Mostra pagina de login."""
+    if check_session(request):
+        raise web.HTTPFound("/")
+    return web.Response(text=get_login_html(), content_type='text/html')
+
+
+async def handle_login_post(request):
+    """Processa form de login."""
+    data = await request.post()
+    username = data.get("username", "")
+    password = data.get("password", "")
+    pw_hash = hashlib.sha256(password.encode()).hexdigest()
+
+    if username == AUTH_USER and pw_hash == AUTH_PASS_HASH:
+        token = secrets.token_hex(32)
+        SESSIONS[token] = {"user": username, "created": time.time()}
+        # Limpa sessoes antigas
+        now = time.time()
+        expired = [k for k, v in SESSIONS.items() if now - v["created"] > SESSION_MAX_AGE]
+        for k in expired:
+            SESSIONS.pop(k, None)
+        resp = web.HTTPFound("/")
+        resp.set_cookie("session", token, max_age=SESSION_MAX_AGE, httponly=True, samesite="Lax")
+        raise resp
+    else:
+        return web.Response(text=get_login_html("Usuario ou senha incorretos"), content_type='text/html')
+
+
+async def handle_logout(request):
+    """Encerra sessao."""
+    token = request.cookies.get("session")
+    if token:
+        SESSIONS.pop(token, None)
+    resp = web.HTTPFound("/login")
+    resp.del_cookie("session")
+    raise resp
+
+
 async def handle_index(request):
+    if not check_session(request):
+        raise web.HTTPFound("/login")
     return web.Response(text=get_dashboard_html(), content_type='text/html')
 
 
 async def handle_get_data(request):
     """Frontend polls this endpoint."""
+    if not check_session(request):
+        return web.json_response({"error": "unauthorized"}, status=401)
     return web.json_response(BOT_DATA)
 
 
@@ -1474,6 +1623,8 @@ async def handle_push_data(request):
 
 async def handle_toggle_strategy(request):
     """Toggle pause/resume de uma estrategia via dashboard."""
+    if not check_session(request):
+        return web.json_response({"error": "unauthorized"}, status=401)
     try:
         data = await request.json()
         key = data.get("strategy", "")
@@ -1488,6 +1639,8 @@ async def handle_toggle_strategy(request):
 
 async def handle_allocate_strategy(request):
     """Aloca capital real para uma estrategia."""
+    if not check_session(request):
+        return web.json_response({"error": "unauthorized"}, status=401)
     try:
         data = await request.json()
         key = data.get("strategy", "")
@@ -1511,6 +1664,8 @@ async def handle_allocate_strategy(request):
 
 async def handle_deallocate_strategy(request):
     """Remove alocacao de capital real de uma estrategia."""
+    if not check_session(request):
+        return web.json_response({"error": "unauthorized"}, status=401)
     try:
         data = await request.json()
         key = data.get("strategy", "")
@@ -1529,6 +1684,8 @@ async def handle_deallocate_strategy(request):
 async def handle_save_settings(request):
     """Salva configuracoes (private key, paper mode) via comando para o bot.
     Guarda em BOT_DATA para persistir entre deploys do Render."""
+    if not check_session(request):
+        return web.json_response({"error": "unauthorized"}, status=401)
     try:
         data = await request.json()
         pk = data.get("private_key")  # None = nao alterar, string = novo valor
@@ -1555,6 +1712,9 @@ async def handle_health(request):
 # ============================================================
 def create_app():
     app = web.Application()
+    app.router.add_get('/login', handle_login_page)
+    app.router.add_post('/login', handle_login_post)
+    app.router.add_get('/logout', handle_logout)
     app.router.add_get('/', handle_index)
     app.router.add_get('/api/data', handle_get_data)
     app.router.add_post('/api/push', handle_push_data)

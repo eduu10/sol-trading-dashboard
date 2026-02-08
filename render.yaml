@@ -11,3 +11,7 @@ services:
         value: sol-trading-2026
       - key: PORT
         value: 10000
+      - key: DASH_USER
+        value: claudinhoadm1n
+      - key: DASH_PASS
+        value: deger1266cabuloso
