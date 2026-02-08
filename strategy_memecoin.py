@@ -75,8 +75,17 @@ class MemeCoinStrategy:
         {"name": "SAMO", "base_price": 0.02, "volatility": 0.16},
     ]
 
+    INITIAL_CAPITAL = 100.0
+
     def __init__(self):
         self.signals: List[MemeCoinSignal] = []
+        self.capital = self.INITIAL_CAPITAL
+        self.total_invested = 0.0
+        self.total_gains = 0.0
+        self.total_losses = 0.0
+        self.daily_history: List[Dict] = []
+        self._today_str = datetime.now(BR_TZ).strftime("%Y-%m-%d")
+        self._today_start_capital = self.capital
         self.stats = {
             "total_trades": 0,
             "wins": 0,
@@ -102,11 +111,27 @@ class MemeCoinStrategy:
             "trailing_stop_pct": 8.0,      # Trailing 8%
         }
 
+    def _check_new_day(self):
+        today = datetime.now(BR_TZ).strftime("%Y-%m-%d")
+        if today != self._today_str:
+            self.daily_history.append({
+                "date": self._today_str,
+                "start_capital": self._today_start_capital,
+                "end_capital": self.capital,
+                "pnl": self.capital - self._today_start_capital,
+            })
+            if len(self.daily_history) > 30:
+                self.daily_history = self.daily_history[-30:]
+            self._today_str = today
+            self._today_start_capital = self.capital
+
     async def simulate_analysis(self) -> Dict:
         """
         Simula analise de meme coins.
         Em producao: usaria DexScreener/Birdeye APIs para dados reais.
+        Capital ficticio: $100 inicial.
         """
+        self._check_new_day()
         now = time.time()
         token = random.choice(self.TRACKED_TOKENS)
 
@@ -147,6 +172,12 @@ class MemeCoinStrategy:
             signal.status = "entered"
             signal.pnl_pct = price_change
 
+            # Tamanho da posicao: 10% do capital
+            trade_size = self.capital * (self.config["max_position_pct"] / 100)
+            if trade_size < 0.01:
+                trade_size = 0.01
+            trade_pnl_usd = trade_size * (price_change / 100)
+
             if price_change >= self.config["take_profit_pct"]:
                 signal.status = "exited"
                 signal.exit_price = signal.current_price
@@ -156,8 +187,17 @@ class MemeCoinStrategy:
                 signal.exit_price = signal.current_price
                 self.stats["losses"] += 1
             else:
-                # Ainda segurando
+                # Ainda segurando - PnL nao realizado
                 pass
+
+            # Atualiza capital (trades finalizados)
+            if signal.status in ("exited", "stopped"):
+                self.total_invested += trade_size
+                if trade_pnl_usd > 0:
+                    self.total_gains += trade_pnl_usd
+                else:
+                    self.total_losses += abs(trade_pnl_usd)
+                self.capital += trade_pnl_usd
 
             self.stats["total_trades"] += 1
             if momentum >= 0.7:
@@ -185,6 +225,7 @@ class MemeCoinStrategy:
 
     def get_dashboard_data(self) -> Dict:
         recent = self.signals[-10:] if self.signals else []
+        today_pnl = self.capital - self._today_start_capital
         return {
             "strategy_name": self.NAME,
             "risk_level": self.RISK_LEVEL,
@@ -192,6 +233,17 @@ class MemeCoinStrategy:
             "time_frame": self.TIME_FRAME,
             "description": self.DESCRIPTION,
             "tools": self.TOOLS,
+            "capital": {
+                "initial": self.INITIAL_CAPITAL,
+                "current": round(self.capital, 2),
+                "total_invested": round(self.total_invested, 2),
+                "total_gains": round(self.total_gains, 2),
+                "total_losses": round(self.total_losses, 2),
+                "pnl_usd": round(self.capital - self.INITIAL_CAPITAL, 2),
+                "pnl_pct": round(((self.capital - self.INITIAL_CAPITAL) / self.INITIAL_CAPITAL) * 100, 2),
+                "today_pnl": round(today_pnl, 2),
+            },
+            "daily_history": self.daily_history[-7:],
             "stats": self.stats.copy(),
             "recent_signals": [
                 {

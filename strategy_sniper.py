@@ -47,6 +47,7 @@ class SnipingStrategy:
     - Simula compra instantanea no preco de lancamento
     - Rastreia evolucao do preco
     - Calcula PnL virtual se tivesse comprado
+    - Capital ficticio de $100 para day trade
     """
 
     NAME = "Sniping Pump.fun"
@@ -59,8 +60,17 @@ class SnipingStrategy:
     )
     TOOLS = ["Solana Sniper Bot", "MEV Bots", "Pump.fun API"]
 
+    INITIAL_CAPITAL = 100.0
+
     def __init__(self):
         self.targets: List[SnipeTarget] = []
+        self.capital = self.INITIAL_CAPITAL
+        self.total_invested = 0.0
+        self.total_gains = 0.0
+        self.total_losses = 0.0
+        self.daily_history: List[Dict] = []
+        self._today_str = datetime.now(BR_TZ).strftime("%Y-%m-%d")
+        self._today_start_capital = self.capital
         self.stats = {
             "total_snipes": 0,
             "successful": 0,
@@ -84,16 +94,32 @@ class SnipingStrategy:
             "rug_detection": True,      # Detectar rug pulls
             "min_holders": 5,           # Minimo de holders antes de comprar
             "blacklist_devs": [],       # Devs conhecidos por rug
+            "trade_size_pct": 10.0,     # Usa 10% do capital por snipe
         }
         self._running = False
+
+    def _check_new_day(self):
+        today = datetime.now(BR_TZ).strftime("%Y-%m-%d")
+        if today != self._today_str:
+            self.daily_history.append({
+                "date": self._today_str,
+                "start_capital": self._today_start_capital,
+                "end_capital": self.capital,
+                "pnl": self.capital - self._today_start_capital,
+            })
+            if len(self.daily_history) > 30:
+                self.daily_history = self.daily_history[-30:]
+            self._today_str = today
+            self._today_start_capital = self.capital
 
     async def simulate_monitoring(self) -> Dict:
         """
         Simula monitoramento de novos tokens.
         Em producao: conectaria ao websocket do Pump.fun para detectar lancamentos.
         Em teste: gera dados simulados baseados em padroes reais.
+        Capital ficticio: $100 inicial, cada snipe usa % do capital.
         """
-        # Simula deteccao de novo token
+        self._check_new_day()
         now = time.time()
         simulated_tokens = [
             {"name": "DOGE2024", "liq": 5.2, "holders": 12, "price_change": random.uniform(-80, 500)},
@@ -106,6 +132,11 @@ class SnipingStrategy:
         token = random.choice(simulated_tokens)
         is_rug = token["price_change"] <= -90 and token["liq"] < 1.0
 
+        # Calcula tamanho do trade baseado no capital disponivel
+        trade_size = self.capital * (self.config["trade_size_pct"] / 100)
+        if trade_size < 0.01:
+            trade_size = 0.01  # minimo
+
         target = SnipeTarget(
             token_address=f"sim_{int(now)}_{random.randint(1000,9999)}",
             token_name=token["name"],
@@ -116,9 +147,11 @@ class SnipingStrategy:
         )
 
         # Simula resultado
+        trade_pnl_usd = 0.0
         if is_rug:
             target.status = "rugged"
             target.pnl_pct = -99.0
+            trade_pnl_usd = trade_size * (target.pnl_pct / 100)
             self.stats["rugged"] += 1
         elif token["liq"] < self.config["min_liquidity_sol"]:
             target.status = "failed"
@@ -127,10 +160,20 @@ class SnipingStrategy:
         else:
             target.status = "sold"
             target.pnl_pct = token["price_change"]
+            trade_pnl_usd = trade_size * (target.pnl_pct / 100)
             if target.pnl_pct > 0:
                 self.stats["successful"] += 1
             else:
                 self.stats["failed"] += 1
+
+        # Atualiza capital
+        if target.status != "failed":
+            self.total_invested += trade_size
+            if trade_pnl_usd > 0:
+                self.total_gains += trade_pnl_usd
+            else:
+                self.total_losses += abs(trade_pnl_usd)
+            self.capital += trade_pnl_usd
 
         target.current_price = target.buy_price * (1 + target.pnl_pct / 100)
         self.targets.append(target)
@@ -156,6 +199,7 @@ class SnipingStrategy:
 
     def get_dashboard_data(self) -> Dict:
         recent = self.targets[-10:] if self.targets else []
+        today_pnl = self.capital - self._today_start_capital
         return {
             "strategy_name": self.NAME,
             "risk_level": self.RISK_LEVEL,
@@ -163,6 +207,17 @@ class SnipingStrategy:
             "time_frame": self.TIME_FRAME,
             "description": self.DESCRIPTION,
             "tools": self.TOOLS,
+            "capital": {
+                "initial": self.INITIAL_CAPITAL,
+                "current": round(self.capital, 2),
+                "total_invested": round(self.total_invested, 2),
+                "total_gains": round(self.total_gains, 2),
+                "total_losses": round(self.total_losses, 2),
+                "pnl_usd": round(self.capital - self.INITIAL_CAPITAL, 2),
+                "pnl_pct": round(((self.capital - self.INITIAL_CAPITAL) / self.INITIAL_CAPITAL) * 100, 2),
+                "today_pnl": round(today_pnl, 2),
+            },
+            "daily_history": self.daily_history[-7:],
             "stats": self.stats.copy(),
             "recent_targets": [
                 {

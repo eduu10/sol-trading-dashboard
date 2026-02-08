@@ -73,8 +73,17 @@ class ScalpingStrategy:
         {"token": "ORCA", "price": 3.80, "spread": 0.04, "volatility_1m": 0.09},
     ]
 
+    INITIAL_CAPITAL = 100.0
+
     def __init__(self):
         self.trades: List[ScalpTrade] = []
+        self.capital = self.INITIAL_CAPITAL
+        self.total_invested = 0.0
+        self.total_gains = 0.0
+        self.total_losses = 0.0
+        self.daily_history: List[Dict] = []
+        self._today_str = datetime.now(BR_TZ).strftime("%Y-%m-%d")
+        self._today_start_capital = self.capital
         self.stats = {
             "total_trades": 0,
             "wins": 0,
@@ -95,7 +104,7 @@ class ScalpingStrategy:
             "max_drawdown_pct": 0.0,
         }
         self.config = {
-            "scalp_size_usd": 100,       # $100 por scalp
+            "scalp_size_pct": 15.0,      # Usa 15% do capital por scalp
             "take_profit_pct": 0.5,      # TP 0.5% (pequeno mas frequente)
             "stop_loss_pct": 0.3,        # SL 0.3% (stop rigido!)
             "max_hold_time_s": 300,      # Max 5 min
@@ -112,11 +121,27 @@ class ScalpingStrategy:
         self._consecutive_wins = 0
         self._consecutive_losses = 0
 
+    def _check_new_day(self):
+        today = datetime.now(BR_TZ).strftime("%Y-%m-%d")
+        if today != self._today_str:
+            self.daily_history.append({
+                "date": self._today_str,
+                "start_capital": self._today_start_capital,
+                "end_capital": self.capital,
+                "pnl": self.capital - self._today_start_capital,
+            })
+            if len(self.daily_history) > 30:
+                self.daily_history = self.daily_history[-30:]
+            self._today_str = today
+            self._today_start_capital = self.capital
+
     async def simulate_scalp(self) -> Dict:
         """
         Simula uma operacao de scalping.
         Em producao: usaria dados tick-by-tick e order book.
+        Capital ficticio: $100 inicial.
         """
+        self._check_new_day()
         now = time.time()
         token_data = random.choice(self.SCALP_TOKENS)
 
@@ -185,7 +210,18 @@ class ScalpingStrategy:
         else:
             pnl_pct = ((entry - exit_price) / entry) * 100 - spread_cost * 100
 
-        pnl_usd = self.config["scalp_size_usd"] * (pnl_pct / 100)
+        scalp_size = self.capital * (self.config["scalp_size_pct"] / 100)
+        if scalp_size < 0.01:
+            scalp_size = 0.01
+        pnl_usd = scalp_size * (pnl_pct / 100)
+
+        # Atualiza capital
+        self.total_invested += scalp_size
+        if pnl_usd > 0:
+            self.total_gains += pnl_usd
+        else:
+            self.total_losses += abs(pnl_usd)
+        self.capital += pnl_usd
 
         trade = ScalpTrade(
             token=token_data["token"],
@@ -280,6 +316,7 @@ class ScalpingStrategy:
 
     def get_dashboard_data(self) -> Dict:
         recent = self.trades[-10:] if self.trades else []
+        today_pnl = self.capital - self._today_start_capital
         return {
             "strategy_name": self.NAME,
             "risk_level": self.RISK_LEVEL,
@@ -287,6 +324,17 @@ class ScalpingStrategy:
             "time_frame": self.TIME_FRAME,
             "description": self.DESCRIPTION,
             "tools": self.TOOLS,
+            "capital": {
+                "initial": self.INITIAL_CAPITAL,
+                "current": round(self.capital, 2),
+                "total_invested": round(self.total_invested, 2),
+                "total_gains": round(self.total_gains, 2),
+                "total_losses": round(self.total_losses, 2),
+                "pnl_usd": round(self.capital - self.INITIAL_CAPITAL, 2),
+                "pnl_pct": round(((self.capital - self.INITIAL_CAPITAL) / self.INITIAL_CAPITAL) * 100, 2),
+                "today_pnl": round(today_pnl, 2),
+            },
+            "daily_history": self.daily_history[-7:],
             "stats": self.stats.copy(),
             "recent_trades": [
                 {

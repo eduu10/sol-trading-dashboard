@@ -71,8 +71,17 @@ class ArbitrageStrategy:
         {"token": "ORCA/USDC", "base_price": 3.80, "avg_spread": 0.12},
     ]
 
+    INITIAL_CAPITAL = 100.0
+
     def __init__(self):
         self.opportunities: List[ArbitrageOpportunity] = []
+        self.capital = self.INITIAL_CAPITAL
+        self.total_invested = 0.0
+        self.total_gains = 0.0
+        self.total_losses = 0.0
+        self.daily_history: List[Dict] = []
+        self._today_str = datetime.now(BR_TZ).strftime("%Y-%m-%d")
+        self._today_start_capital = self.capital
         self.stats = {
             "total_scans": 0,
             "opportunities_found": 0,
@@ -98,14 +107,31 @@ class ArbitrageStrategy:
             "use_jito_bundles": True,       # MEV protection via Jito
             "flash_loan": False,            # Flash loans para amplificar
             "max_concurrent": 3,            # Max trades simultaneos
+            "trade_size_pct": 20.0,         # Usa 20% do capital por arb
         }
         self._start_time = time.time()
+
+    def _check_new_day(self):
+        today = datetime.now(BR_TZ).strftime("%Y-%m-%d")
+        if today != self._today_str:
+            self.daily_history.append({
+                "date": self._today_str,
+                "start_capital": self._today_start_capital,
+                "end_capital": self.capital,
+                "pnl": self.capital - self._today_start_capital,
+            })
+            if len(self.daily_history) > 30:
+                self.daily_history = self.daily_history[-30:]
+            self._today_str = today
+            self._today_start_capital = self.capital
 
     async def simulate_scan(self) -> Dict:
         """
         Simula scan de arbitragem entre DEXs.
         Em producao: consultaria todas DEXs via websocket simultaneamente.
+        Capital ficticio: $100 inicial.
         """
+        self._check_new_day()
         self.stats["total_scans"] += 1
         now = time.time()
 
@@ -129,7 +155,13 @@ class ArbitrageStrategy:
 
         # Simula trade se spread suficiente
         if spread_pct >= self.config["min_spread_pct"]:
-            trade_usd = min(self.config["max_trade_usd"], random.uniform(100, 1000))
+            # Usa % do capital como volume de trade
+            trade_usd = min(
+                self.capital * (self.config["trade_size_pct"] / 100),
+                random.uniform(10, self.capital * 0.5)
+            )
+            if trade_usd < 0.01:
+                trade_usd = 0.01
             gross_profit = trade_usd * (spread_pct / 100)
             gas_cost = random.uniform(0.001, 0.01)  # Solana gas
             execution_ms = random.uniform(50, 500)
@@ -160,12 +192,22 @@ class ArbitrageStrategy:
                 self.stats["executed"] += 1
                 self.stats["total_profit_usd"] += actual_profit
                 self.stats["total_gas_paid"] += gas_cost
+                # Atualiza capital
+                self.total_invested += trade_usd
+                if actual_profit > 0:
+                    self.total_gains += actual_profit
+                else:
+                    self.total_losses += abs(actual_profit)
+                self.capital += actual_profit
             elif random.random() < 0.5:
                 opp.status = "missed"
                 self.stats["missed"] += 1
             else:
                 opp.status = "failed"
                 self.stats["failed"] += 1
+                # Falha custa gas
+                self.capital -= gas_cost
+                self.total_losses += gas_cost
 
             self.opportunities.append(opp)
             self.stats["opportunities_found"] += 1
@@ -194,6 +236,7 @@ class ArbitrageStrategy:
 
     def get_dashboard_data(self) -> Dict:
         recent = self.opportunities[-10:] if self.opportunities else []
+        today_pnl = self.capital - self._today_start_capital
         return {
             "strategy_name": self.NAME,
             "risk_level": self.RISK_LEVEL,
@@ -201,6 +244,17 @@ class ArbitrageStrategy:
             "time_frame": self.TIME_FRAME,
             "description": self.DESCRIPTION,
             "tools": self.TOOLS,
+            "capital": {
+                "initial": self.INITIAL_CAPITAL,
+                "current": round(self.capital, 2),
+                "total_invested": round(self.total_invested, 2),
+                "total_gains": round(self.total_gains, 2),
+                "total_losses": round(self.total_losses, 2),
+                "pnl_usd": round(self.capital - self.INITIAL_CAPITAL, 2),
+                "pnl_pct": round(((self.capital - self.INITIAL_CAPITAL) / self.INITIAL_CAPITAL) * 100, 2),
+                "today_pnl": round(today_pnl, 2),
+            },
+            "daily_history": self.daily_history[-7:],
             "stats": self.stats.copy(),
             "recent_opportunities": [
                 {

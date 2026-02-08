@@ -387,6 +387,11 @@ def get_dashboard_html():
         .strat-recent-item { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; font-size: 0.72em; font-family: 'JetBrains Mono', monospace; }
         .strat-recent-name { color: var(--text-secondary); }
         .strat-recent-pnl { font-weight: 600; }
+        .strat-capital { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; margin: 10px 0; padding: 8px 10px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid var(--border-color); }
+        .strat-cap-item { display: flex; justify-content: space-between; align-items: center; }
+        .strat-cap-label { font-size: 0.6em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .strat-cap-value { font-family: 'JetBrains Mono', monospace; font-size: 0.72em; font-weight: 600; }
+        .strat-cap-full { grid-column: 1 / 3; border-top: 1px solid var(--border-color); padding-top: 4px; margin-top: 2px; }
         @media (max-width: 1024px) {
             .main { grid-template-columns: 1fr 1fr; }
             .chart-card, .positions-card, .log-card, .analysis-card { grid-column: 1 / 3; }
@@ -519,7 +524,14 @@ def get_dashboard_html():
                         <span class="strat-badge return-badge">Retorno Muito Alto</span>
                         <span class="strat-badge time-badge">Segundos</span>
                     </div>
-                    <div class="strat-pnl neutral" id="strat-sniper-pnl">0.0%</div>
+                    <div class="strat-pnl neutral" id="strat-sniper-pnl">$0.00</div>
+                    <div class="strat-capital">
+                        <div class="strat-cap-item"><span class="strat-cap-label">Capital</span><span class="strat-cap-value" id="strat-sniper-cap" style="color:var(--yellow)">$100.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Investido</span><span class="strat-cap-value" id="strat-sniper-inv">$0.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Ganhos</span><span class="strat-cap-value" id="strat-sniper-gain" style="color:var(--green)">$0.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Perdas</span><span class="strat-cap-value" id="strat-sniper-loss" style="color:var(--red)">$0.00</span></div>
+                        <div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Hoje</span><span class="strat-cap-value" id="strat-sniper-today">$0.00</span></div>
+                    </div>
                     <div class="strat-stats">
                         <div class="strat-stat-row"><span class="strat-stat-label">Snipes</span><span class="strat-stat-value" id="strat-sniper-trades">0</span></div>
                         <div class="strat-stat-row"><span class="strat-stat-label">Win Rate</span><span class="strat-stat-value" id="strat-sniper-wr">0%</span></div>
@@ -548,7 +560,14 @@ def get_dashboard_html():
                         <span class="strat-badge return-badge">Retorno Alto</span>
                         <span class="strat-badge time-badge">Min a Horas</span>
                     </div>
-                    <div class="strat-pnl neutral" id="strat-meme-pnl">0.0%</div>
+                    <div class="strat-pnl neutral" id="strat-meme-pnl">$0.00</div>
+                    <div class="strat-capital">
+                        <div class="strat-cap-item"><span class="strat-cap-label">Capital</span><span class="strat-cap-value" id="strat-meme-cap" style="color:var(--yellow)">$100.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Investido</span><span class="strat-cap-value" id="strat-meme-inv">$0.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Ganhos</span><span class="strat-cap-value" id="strat-meme-gain" style="color:var(--green)">$0.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Perdas</span><span class="strat-cap-value" id="strat-meme-loss" style="color:var(--red)">$0.00</span></div>
+                        <div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Hoje</span><span class="strat-cap-value" id="strat-meme-today">$0.00</span></div>
+                    </div>
                     <div class="strat-stats">
                         <div class="strat-stat-row"><span class="strat-stat-label">Trades</span><span class="strat-stat-value" id="strat-meme-trades">0</span></div>
                         <div class="strat-stat-row"><span class="strat-stat-label">Win Rate</span><span class="strat-stat-value" id="strat-meme-wr">0%</span></div>
@@ -578,6 +597,13 @@ def get_dashboard_html():
                         <span class="strat-badge time-badge">Milissegundos</span>
                     </div>
                     <div class="strat-pnl neutral" id="strat-arb-pnl">$0.00</div>
+                    <div class="strat-capital">
+                        <div class="strat-cap-item"><span class="strat-cap-label">Capital</span><span class="strat-cap-value" id="strat-arb-cap" style="color:var(--yellow)">$100.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Investido</span><span class="strat-cap-value" id="strat-arb-inv">$0.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Ganhos</span><span class="strat-cap-value" id="strat-arb-gain" style="color:var(--green)">$0.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Perdas</span><span class="strat-cap-value" id="strat-arb-loss" style="color:var(--red)">$0.00</span></div>
+                        <div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Hoje</span><span class="strat-cap-value" id="strat-arb-today">$0.00</span></div>
+                    </div>
                     <div class="strat-stats">
                         <div class="strat-stat-row"><span class="strat-stat-label">Executados</span><span class="strat-stat-value" id="strat-arb-trades">0</span></div>
                         <div class="strat-stat-row"><span class="strat-stat-label">Avg Spread</span><span class="strat-stat-value" id="strat-arb-spread">0%</span></div>
@@ -607,6 +633,13 @@ def get_dashboard_html():
                         <span class="strat-badge time-badge">1-5 min</span>
                     </div>
                     <div class="strat-pnl neutral" id="strat-scalp-pnl">$0.00</div>
+                    <div class="strat-capital">
+                        <div class="strat-cap-item"><span class="strat-cap-label">Capital</span><span class="strat-cap-value" id="strat-scalp-cap" style="color:var(--yellow)">$100.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Investido</span><span class="strat-cap-value" id="strat-scalp-inv">$0.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Ganhos</span><span class="strat-cap-value" id="strat-scalp-gain" style="color:var(--green)">$0.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Perdas</span><span class="strat-cap-value" id="strat-scalp-loss" style="color:var(--red)">$0.00</span></div>
+                        <div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Hoje</span><span class="strat-cap-value" id="strat-scalp-today">$0.00</span></div>
+                    </div>
                     <div class="strat-stats">
                         <div class="strat-stat-row"><span class="strat-stat-label">Trades</span><span class="strat-stat-value" id="strat-scalp-trades">0</span></div>
                         <div class="strat-stat-row"><span class="strat-stat-label">Win Rate</span><span class="strat-stat-value" id="strat-scalp-wr">0%</span></div>
@@ -636,6 +669,13 @@ def get_dashboard_html():
                         <span class="strat-badge time-badge">Horas a Dias</span>
                     </div>
                     <div class="strat-pnl neutral" id="strat-lev-pnl">$0.00</div>
+                    <div class="strat-capital">
+                        <div class="strat-cap-item"><span class="strat-cap-label">Capital</span><span class="strat-cap-value" id="strat-lev-cap" style="color:var(--yellow)">$100.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Investido</span><span class="strat-cap-value" id="strat-lev-inv">$0.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Ganhos</span><span class="strat-cap-value" id="strat-lev-gain" style="color:var(--green)">$0.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Perdas</span><span class="strat-cap-value" id="strat-lev-loss" style="color:var(--red)">$0.00</span></div>
+                        <div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Hoje</span><span class="strat-cap-value" id="strat-lev-today">$0.00</span></div>
+                    </div>
                     <div class="strat-stats">
                         <div class="strat-stat-row"><span class="strat-stat-label">Trades</span><span class="strat-stat-value" id="strat-lev-trades">0</span></div>
                         <div class="strat-stat-row"><span class="strat-stat-label">Win Rate</span><span class="strat-stat-value" id="strat-lev-wr">0%</span></div>
@@ -744,9 +784,19 @@ function updateDashboard(data) {
     if(data.strategies){updateStrategies(data.strategies);}
 }
 function updateStrategies(strats){
+    function setCap(prefix,cap){
+        if(!cap)return;
+        setText(prefix+'-cap','$'+cap.current.toFixed(2));
+        setText(prefix+'-inv','$'+cap.total_invested.toFixed(2));
+        setText(prefix+'-gain','$'+cap.total_gains.toFixed(2));
+        setText(prefix+'-loss','$'+cap.total_losses.toFixed(2));
+        var te=document.getElementById(prefix+'-today');
+        if(te){te.textContent=(cap.today_pnl>=0?'+$':'-$')+Math.abs(cap.today_pnl).toFixed(2);te.style.color=cap.today_pnl>=0?'var(--green)':'var(--red)';}
+    }
     // 1. Sniper
-    if(strats.sniper){const s=strats.sniper.stats||{};
-        setPnl('strat-sniper-pnl',s.total_pnl||0,true);
+    if(strats.sniper){const s=strats.sniper.stats||{},c=strats.sniper.capital||{};
+        setPnl('strat-sniper-pnl',c.pnl_usd||0,false);
+        setCap('strat-sniper',c);
         setText('strat-sniper-trades',s.total_snipes||0);
         setText('strat-sniper-wr',(s.win_rate||0).toFixed(0)+'%');
         setBar('strat-sniper-wrbar',s.win_rate||0);
@@ -754,8 +804,9 @@ function updateStrategies(strats){
         setRecent('strat-sniper-recent',(strats.sniper.recent_targets||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.name}</span><span class="strat-recent-pnl" style="color:${t.pnl_pct>=0?'var(--green)':'var(--red)'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</span></div>`);
     }
     // 2. Memecoin
-    if(strats.memecoin){const s=strats.memecoin.stats||{};
-        setPnl('strat-meme-pnl',s.total_pnl||0,true);
+    if(strats.memecoin){const s=strats.memecoin.stats||{},c=strats.memecoin.capital||{};
+        setPnl('strat-meme-pnl',c.pnl_usd||0,false);
+        setCap('strat-meme',c);
         setText('strat-meme-trades',s.total_trades||0);
         setText('strat-meme-wr',(s.win_rate||0).toFixed(0)+'%');
         setBar('strat-meme-wrbar',s.win_rate||0);
@@ -763,8 +814,9 @@ function updateStrategies(strats){
         setRecent('strat-meme-recent',(strats.memecoin.recent_signals||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.name}</span><span class="strat-recent-pnl" style="color:${t.pnl_pct>=0?'var(--green)':'var(--red)'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</span></div>`);
     }
     // 3. Arbitrage
-    if(strats.arbitrage){const s=strats.arbitrage.stats||{};
-        setPnl('strat-arb-pnl',s.net_profit||0,false);
+    if(strats.arbitrage){const s=strats.arbitrage.stats||{},c=strats.arbitrage.capital||{};
+        setPnl('strat-arb-pnl',c.pnl_usd||0,false);
+        setCap('strat-arb',c);
         setText('strat-arb-trades',s.executed||0);
         setText('strat-arb-spread',(s.avg_spread_pct||0).toFixed(3)+'%');
         setBar('strat-arb-wrbar',s.executed>0?((s.executed/(s.executed+s.failed+s.missed||1))*100):0);
@@ -772,8 +824,9 @@ function updateStrategies(strats){
         setRecent('strat-arb-recent',(strats.arbitrage.recent_opportunities||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.token} ${t.buy_dex}>${t.sell_dex}</span><span class="strat-recent-pnl" style="color:${t.profit>=0?'var(--green)':'var(--red)'}">$${t.profit.toFixed(3)}</span></div>`);
     }
     // 4. Scalping
-    if(strats.scalping){const s=strats.scalping.stats||{};
-        setPnl('strat-scalp-pnl',s.total_pnl_usd||0,false);
+    if(strats.scalping){const s=strats.scalping.stats||{},c=strats.scalping.capital||{};
+        setPnl('strat-scalp-pnl',c.pnl_usd||0,false);
+        setCap('strat-scalp',c);
         setText('strat-scalp-trades',s.total_trades||0);
         setText('strat-scalp-wr',(s.win_rate||0).toFixed(0)+'%');
         setBar('strat-scalp-wrbar',s.win_rate||0);
@@ -781,8 +834,9 @@ function updateStrategies(strats){
         setRecent('strat-scalp-recent',(strats.scalping.recent_trades||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.token} ${t.direction}</span><span class="strat-recent-pnl" style="color:${t.pnl_pct>=0?'var(--green)':'var(--red)'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct.toFixed(2)}%</span></div>`);
     }
     // 5. Leverage
-    if(strats.leverage){const s=strats.leverage.stats||{};
-        setPnl('strat-lev-pnl',s.total_pnl_usd||0,false);
+    if(strats.leverage){const s=strats.leverage.stats||{},c=strats.leverage.capital||{};
+        setPnl('strat-lev-pnl',c.pnl_usd||0,false);
+        setCap('strat-lev',c);
         setText('strat-lev-trades',s.total_trades||0);
         setText('strat-lev-wr',(s.win_rate||0).toFixed(0)+'%');
         setBar('strat-lev-wrbar',s.win_rate||0);

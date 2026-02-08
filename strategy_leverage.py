@@ -80,8 +80,17 @@ class LeverageStrategy:
         {"token": "JUP", "price": 1.20, "daily_vol": 5.0},
     ]
 
+    INITIAL_CAPITAL = 100.0
+
     def __init__(self):
         self.positions: List[LeveragePosition] = []
+        self.capital = self.INITIAL_CAPITAL
+        self.total_invested = 0.0
+        self.total_gains = 0.0
+        self.total_losses = 0.0
+        self.daily_history: List[Dict] = []
+        self._today_str = datetime.now(BR_TZ).strftime("%Y-%m-%d")
+        self._today_start_capital = self.capital
         self.stats = {
             "total_trades": 0,
             "wins": 0,
@@ -103,7 +112,7 @@ class LeverageStrategy:
         self.config = {
             "default_leverage": 5,       # 5x padrao
             "max_leverage": 20,          # Max 20x
-            "margin_usd": 100,           # $100 margem por trade
+            "margin_pct": 20.0,          # Usa 20% do capital como margem
             "take_profit_pct": 10.0,     # TP 10% (= 50% com 5x)
             "stop_loss_pct": 5.0,        # SL 5% (= 25% com 5x)
             "max_positions": 2,          # Max 2 posicoes
@@ -113,11 +122,27 @@ class LeverageStrategy:
         }
         self._equity_curve = [0.0]
 
+    def _check_new_day(self):
+        today = datetime.now(BR_TZ).strftime("%Y-%m-%d")
+        if today != self._today_str:
+            self.daily_history.append({
+                "date": self._today_str,
+                "start_capital": self._today_start_capital,
+                "end_capital": self.capital,
+                "pnl": self.capital - self._today_start_capital,
+            })
+            if len(self.daily_history) > 30:
+                self.daily_history = self.daily_history[-30:]
+            self._today_str = today
+            self._today_start_capital = self.capital
+
     async def simulate_leverage_trade(self) -> Dict:
         """
         Simula um trade com alavancagem.
         Em producao: usaria Jupiter Perpetuals API para abrir posicao real.
+        Capital ficticio: $100 inicial.
         """
+        self._check_new_day()
         now = time.time()
         token_data = random.choice(self.LEVERAGE_TOKENS)
         platform = random.choice(self.PLATFORMS)
@@ -126,7 +151,9 @@ class LeverageStrategy:
         leverage = random.choice([2, 3, 5, 10, 15, 20])
         leverage = min(leverage, platform["max_leverage"])
         direction = random.choice(["long", "short"])
-        margin = self.config["margin_usd"]
+        margin = self.capital * (self.config["margin_pct"] / 100)
+        if margin < 0.01:
+            margin = 0.01
         position_size = margin * leverage
         entry = token_data["price"]
 
@@ -222,6 +249,14 @@ class LeverageStrategy:
 
         pnl_usd -= (funding_paid + fees)
 
+        # Atualiza capital
+        self.total_invested += margin
+        if pnl_usd > 0:
+            self.total_gains += pnl_usd
+        else:
+            self.total_losses += abs(pnl_usd)
+        self.capital += pnl_usd
+
         pos = LeveragePosition(
             token=token_data["token"],
             platform=platform["name"],
@@ -299,6 +334,7 @@ class LeverageStrategy:
 
     def get_dashboard_data(self) -> Dict:
         recent = self.positions[-10:] if self.positions else []
+        today_pnl = self.capital - self._today_start_capital
         return {
             "strategy_name": self.NAME,
             "risk_level": self.RISK_LEVEL,
@@ -306,6 +342,17 @@ class LeverageStrategy:
             "time_frame": self.TIME_FRAME,
             "description": self.DESCRIPTION,
             "tools": self.TOOLS,
+            "capital": {
+                "initial": self.INITIAL_CAPITAL,
+                "current": round(self.capital, 2),
+                "total_invested": round(self.total_invested, 2),
+                "total_gains": round(self.total_gains, 2),
+                "total_losses": round(self.total_losses, 2),
+                "pnl_usd": round(self.capital - self.INITIAL_CAPITAL, 2),
+                "pnl_pct": round(((self.capital - self.INITIAL_CAPITAL) / self.INITIAL_CAPITAL) * 100, 2),
+                "today_pnl": round(today_pnl, 2),
+            },
+            "daily_history": self.daily_history[-7:],
             "stats": self.stats.copy(),
             "recent_positions": [
                 {
