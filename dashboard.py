@@ -591,6 +591,16 @@ DASHBOARD_HTML = r"""
         .strat-winrate-fill { height: 100%; border-radius: 2px; transition: width 1s ease; }
         .strat-recent { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-color); max-height: 0; overflow: hidden; transition: max-height 0.4s ease; }
         .strat-card:hover .strat-recent { max-height: 200px; }
+        .strat-toggle-btn { width: 100%; margin-top: 12px; padding: 8px 0; border: 1px solid var(--border-color); border-radius: 8px; background: rgba(255,255,255,0.03); color: var(--text-secondary); font-size: 0.75em; font-weight: 600; letter-spacing: 0.5px; cursor: pointer; transition: all 0.3s; text-transform: uppercase; }
+        .strat-toggle-btn:hover { background: rgba(255,255,255,0.08); border-color: var(--border-glow); }
+        .strat-toggle-btn.running { color: var(--red); border-color: rgba(255,68,102,0.3); }
+        .strat-toggle-btn.running:hover { background: rgba(255,68,102,0.1); }
+        .strat-toggle-btn.paused { color: var(--green); border-color: rgba(0,255,136,0.3); }
+        .strat-toggle-btn.paused:hover { background: rgba(0,255,136,0.1); }
+        .strat-card.is-paused { opacity: 0.5; }
+        .strat-card.is-paused .strat-pnl { color: var(--text-muted) !important; }
+        .strat-paused-badge { display: none; font-size: 0.6em; color: var(--red); background: rgba(255,68,102,0.1); border: 1px solid rgba(255,68,102,0.2); padding: 2px 8px; border-radius: 4px; font-weight: 600; letter-spacing: 0.5px; margin-left: auto; }
+        .strat-card.is-paused .strat-paused-badge { display: inline-block; }
         .strat-recent-title { font-size: 0.65em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
         .strat-recent-item { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; font-size: 0.72em; font-family: 'JetBrains Mono', monospace; }
         .strat-recent-name { color: var(--text-secondary); }
@@ -855,44 +865,49 @@ DASHBOARD_HTML = r"""
             </div>
             <div class="strategies-grid">
                 <div class="strat-card risk-alto" id="strat-sniper">
-                    <div class="strat-header"><div class="strat-name">Sniping Pump.fun</div><div class="strat-help">?<div class="strat-tooltip"><div class="strat-tooltip-title">Sniping de Novos Tokens</div>Usa bots automatizados para detectar e comprar tokens no momento exato do lancamento no Pump.fun, antes que aparecam para usuarios comuns (vantagem de 0.01s vs 60s). Opera em velocidade ultra-rapida (segundos).<div class="strat-tooltip-tools">Ferramentas: <span>Solana Sniper Bot, MEV Bots</span></div></div></div></div>
+                    <div class="strat-header"><div class="strat-name">Sniping Pump.fun</div><span class="strat-paused-badge">PAUSADO</span><div class="strat-help">?<div class="strat-tooltip"><div class="strat-tooltip-title">Sniping de Novos Tokens</div>Usa bots automatizados para detectar e comprar tokens no momento exato do lancamento no Pump.fun, antes que aparecam para usuarios comuns (vantagem de 0.01s vs 60s). Opera em velocidade ultra-rapida (segundos).<div class="strat-tooltip-tools">Ferramentas: <span>Solana Sniper Bot, MEV Bots</span></div></div></div></div>
                     <div class="strat-badges"><span class="strat-badge risk-high">Risco Alto</span><span class="strat-badge return-badge">Retorno Muito Alto</span><span class="strat-badge time-badge">Segundos</span></div>
                     <div class="strat-pnl neutral" id="strat-sniper-pnl">$0.00</div>
                     <div class="strat-capital"><div class="strat-cap-item"><span class="strat-cap-label">Capital</span><span class="strat-cap-value" id="strat-sniper-cap" style="color:var(--yellow)">$100.00</span></div><div class="strat-cap-item"><span class="strat-cap-label">Investido</span><span class="strat-cap-value" id="strat-sniper-inv">$0.00</span></div><div class="strat-cap-item"><span class="strat-cap-label">Ganhos</span><span class="strat-cap-value" id="strat-sniper-gain" style="color:var(--green)">$0.00</span></div><div class="strat-cap-item"><span class="strat-cap-label">Perdas</span><span class="strat-cap-value" id="strat-sniper-loss" style="color:var(--red)">$0.00</span></div><div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Hoje</span><span class="strat-cap-value" id="strat-sniper-today">$0.00</span></div></div>
                     <div class="strat-stats"><div class="strat-stat-row"><span class="strat-stat-label">Snipes</span><span class="strat-stat-value" id="strat-sniper-trades">0</span></div><div class="strat-stat-row"><span class="strat-stat-label">Win Rate</span><span class="strat-stat-value" id="strat-sniper-wr">0%</span></div><div class="strat-winrate-bar"><div class="strat-winrate-fill" id="strat-sniper-wrbar" style="width:0%;background:var(--red)"></div></div><div class="strat-stat-row"><span class="strat-stat-label">Rugged</span><span class="strat-stat-value" id="strat-sniper-rug" style="color:var(--red)">0</span></div></div>
                     <div class="strat-recent"><div class="strat-recent-title">Ultimos Snipes</div><div id="strat-sniper-recent"></div></div>
+                    <button class="strat-toggle-btn running" id="strat-sniper-btn" onclick="toggleStrategy('sniper')">Parar</button>
                 </div>
                 <div class="strat-card risk-alto" id="strat-memecoin">
-                    <div class="strat-header"><div class="strat-name">Meme Coins Liquidez</div><div class="strat-help">?<div class="strat-tooltip"><div class="strat-tooltip-title">Trading de Meme Coins</div>Identifica meme coins da Solana com liquidez real, volume crescente e tempo de mercado. Foca em entradas e saidas rapidas baseadas em momentum e analise on-chain.<div class="strat-tooltip-tools">Ferramentas: <span>DexScreener, Birdeye, Jupiter</span></div></div></div></div>
+                    <div class="strat-header"><div class="strat-name">Meme Coins Liquidez</div><span class="strat-paused-badge">PAUSADO</span><div class="strat-help">?<div class="strat-tooltip"><div class="strat-tooltip-title">Trading de Meme Coins</div>Identifica meme coins da Solana com liquidez real, volume crescente e tempo de mercado. Foca em entradas e saidas rapidas baseadas em momentum e analise on-chain.<div class="strat-tooltip-tools">Ferramentas: <span>DexScreener, Birdeye, Jupiter</span></div></div></div></div>
                     <div class="strat-badges"><span class="strat-badge risk-high">Risco Alto</span><span class="strat-badge return-badge">Retorno Alto</span><span class="strat-badge time-badge">Min a Horas</span></div>
                     <div class="strat-pnl neutral" id="strat-meme-pnl">$0.00</div>
                     <div class="strat-capital"><div class="strat-cap-item"><span class="strat-cap-label">Capital</span><span class="strat-cap-value" id="strat-meme-cap" style="color:var(--yellow)">$100.00</span></div><div class="strat-cap-item"><span class="strat-cap-label">Investido</span><span class="strat-cap-value" id="strat-meme-inv">$0.00</span></div><div class="strat-cap-item"><span class="strat-cap-label">Ganhos</span><span class="strat-cap-value" id="strat-meme-gain" style="color:var(--green)">$0.00</span></div><div class="strat-cap-item"><span class="strat-cap-label">Perdas</span><span class="strat-cap-value" id="strat-meme-loss" style="color:var(--red)">$0.00</span></div><div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Hoje</span><span class="strat-cap-value" id="strat-meme-today">$0.00</span></div></div>
                     <div class="strat-stats"><div class="strat-stat-row"><span class="strat-stat-label">Trades</span><span class="strat-stat-value" id="strat-meme-trades">0</span></div><div class="strat-stat-row"><span class="strat-stat-label">Win Rate</span><span class="strat-stat-value" id="strat-meme-wr">0%</span></div><div class="strat-winrate-bar"><div class="strat-winrate-fill" id="strat-meme-wrbar" style="width:0%;background:var(--red)"></div></div><div class="strat-stat-row"><span class="strat-stat-label">Momentum</span><span class="strat-stat-value" id="strat-meme-momentum" style="color:var(--blue)">0</span></div></div>
                     <div class="strat-recent"><div class="strat-recent-title">Ultimos Sinais</div><div id="strat-meme-recent"></div></div>
+                    <button class="strat-toggle-btn running" id="strat-meme-btn" onclick="toggleStrategy('memecoin')">Parar</button>
                 </div>
                 <div class="strat-card risk-medio" id="strat-arbitrage">
-                    <div class="strat-header"><div class="strat-name">Arbitragem DEX</div><div class="strat-help">?<div class="strat-tooltip"><div class="strat-tooltip-title">Arbitragem entre DEXs</div>Explora diferencas de preco do mesmo token entre Raydium, Jupiter, Meteora e Orca. Executa compra/venda simultanea via bots customizados para lucro sem risco direcional.<div class="strat-tooltip-tools">Ferramentas: <span>Python/Rust Bots, APIs DEX, Jito MEV</span></div></div></div></div>
+                    <div class="strat-header"><div class="strat-name">Arbitragem DEX</div><span class="strat-paused-badge">PAUSADO</span><div class="strat-help">?<div class="strat-tooltip"><div class="strat-tooltip-title">Arbitragem entre DEXs</div>Explora diferencas de preco do mesmo token entre Raydium, Jupiter, Meteora e Orca. Executa compra/venda simultanea via bots customizados para lucro sem risco direcional.<div class="strat-tooltip-tools">Ferramentas: <span>Python/Rust Bots, APIs DEX, Jito MEV</span></div></div></div></div>
                     <div class="strat-badges"><span class="strat-badge risk-med">Risco Medio</span><span class="strat-badge return-badge">Consistente</span><span class="strat-badge time-badge">Milissegundos</span></div>
                     <div class="strat-pnl neutral" id="strat-arb-pnl">$0.00</div>
                     <div class="strat-capital"><div class="strat-cap-item"><span class="strat-cap-label">Capital</span><span class="strat-cap-value" id="strat-arb-cap" style="color:var(--yellow)">$100.00</span></div><div class="strat-cap-item"><span class="strat-cap-label">Investido</span><span class="strat-cap-value" id="strat-arb-inv">$0.00</span></div><div class="strat-cap-item"><span class="strat-cap-label">Ganhos</span><span class="strat-cap-value" id="strat-arb-gain" style="color:var(--green)">$0.00</span></div><div class="strat-cap-item"><span class="strat-cap-label">Perdas</span><span class="strat-cap-value" id="strat-arb-loss" style="color:var(--red)">$0.00</span></div><div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Hoje</span><span class="strat-cap-value" id="strat-arb-today">$0.00</span></div></div>
                     <div class="strat-stats"><div class="strat-stat-row"><span class="strat-stat-label">Executados</span><span class="strat-stat-value" id="strat-arb-trades">0</span></div><div class="strat-stat-row"><span class="strat-stat-label">Avg Spread</span><span class="strat-stat-value" id="strat-arb-spread">0%</span></div><div class="strat-winrate-bar"><div class="strat-winrate-fill" id="strat-arb-wrbar" style="width:0%;background:var(--blue)"></div></div><div class="strat-stat-row"><span class="strat-stat-label">$/hora</span><span class="strat-stat-value" id="strat-arb-perhr" style="color:var(--green)">$0.00</span></div></div>
                     <div class="strat-recent"><div class="strat-recent-title">Ultimas Oportunidades</div><div id="strat-arb-recent"></div></div>
+                    <button class="strat-toggle-btn running" id="strat-arb-btn" onclick="toggleStrategy('arbitrage')">Parar</button>
                 </div>
                 <div class="strat-card risk-medio-baixo" id="strat-scalping">
-                    <div class="strat-header"><div class="strat-name">Scalping Tokens</div><div class="strat-help">?<div class="strat-tooltip"><div class="strat-tooltip-title">Scalping em Tokens Estabelecidos</div>Multiplas operacoes rapidas (1-5 min) em tokens com boa liquidez (SOL, JUP, BONK, WIF). Aproveita micro-movimentos de preco com stop-loss rigido. Foco em consistencia.<div class="strat-tooltip-tools">Ferramentas: <span>Jupiter Router, Graficos 1m/5m</span></div></div></div></div>
+                    <div class="strat-header"><div class="strat-name">Scalping Tokens</div><span class="strat-paused-badge">PAUSADO</span><div class="strat-help">?<div class="strat-tooltip"><div class="strat-tooltip-title">Scalping em Tokens Estabelecidos</div>Multiplas operacoes rapidas (1-5 min) em tokens com boa liquidez (SOL, JUP, BONK, WIF). Aproveita micro-movimentos de preco com stop-loss rigido. Foco em consistencia.<div class="strat-tooltip-tools">Ferramentas: <span>Jupiter Router, Graficos 1m/5m</span></div></div></div></div>
                     <div class="strat-badges"><span class="strat-badge risk-low">Risco Medio-Baixo</span><span class="strat-badge return-badge">Consistente</span><span class="strat-badge time-badge">1-5 min</span></div>
                     <div class="strat-pnl neutral" id="strat-scalp-pnl">$0.00</div>
                     <div class="strat-capital"><div class="strat-cap-item"><span class="strat-cap-label">Capital</span><span class="strat-cap-value" id="strat-scalp-cap" style="color:var(--yellow)">$100.00</span></div><div class="strat-cap-item"><span class="strat-cap-label">Investido</span><span class="strat-cap-value" id="strat-scalp-inv">$0.00</span></div><div class="strat-cap-item"><span class="strat-cap-label">Ganhos</span><span class="strat-cap-value" id="strat-scalp-gain" style="color:var(--green)">$0.00</span></div><div class="strat-cap-item"><span class="strat-cap-label">Perdas</span><span class="strat-cap-value" id="strat-scalp-loss" style="color:var(--red)">$0.00</span></div><div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Hoje</span><span class="strat-cap-value" id="strat-scalp-today">$0.00</span></div></div>
                     <div class="strat-stats"><div class="strat-stat-row"><span class="strat-stat-label">Trades</span><span class="strat-stat-value" id="strat-scalp-trades">0</span></div><div class="strat-stat-row"><span class="strat-stat-label">Win Rate</span><span class="strat-stat-value" id="strat-scalp-wr">0%</span></div><div class="strat-winrate-bar"><div class="strat-winrate-fill" id="strat-scalp-wrbar" style="width:0%;background:var(--green)"></div></div><div class="strat-stat-row"><span class="strat-stat-label">Sharpe</span><span class="strat-stat-value" id="strat-scalp-sharpe" style="color:var(--purple)">0.0</span></div></div>
                     <div class="strat-recent"><div class="strat-recent-title">Ultimos Trades</div><div id="strat-scalp-recent"></div></div>
+                    <button class="strat-toggle-btn running" id="strat-scalp-btn" onclick="toggleStrategy('scalping')">Parar</button>
                 </div>
                 <div class="strat-card risk-muito-alto" id="strat-leverage">
-                    <div class="strat-header"><div class="strat-name">Leverage Trading</div><div class="strat-help">?<div class="strat-tooltip"><div class="strat-tooltip-title">Leverage Trading em DEX</div>Usa Jupiter Perpetuals e Drift Protocol para operar com alavancagem (2x-20x) em SOL e tokens principais. Multiplica exposicao - risco muito alto de liquidacao.<div class="strat-tooltip-tools">Ferramentas: <span>Jupiter Perps, Drift, Mango</span></div></div></div></div>
+                    <div class="strat-header"><div class="strat-name">Leverage Trading</div><span class="strat-paused-badge">PAUSADO</span><div class="strat-help">?<div class="strat-tooltip"><div class="strat-tooltip-title">Leverage Trading em DEX</div>Usa Jupiter Perpetuals e Drift Protocol para operar com alavancagem (2x-20x) em SOL e tokens principais. Multiplica exposicao - risco muito alto de liquidacao.<div class="strat-tooltip-tools">Ferramentas: <span>Jupiter Perps, Drift, Mango</span></div></div></div></div>
                     <div class="strat-badges"><span class="strat-badge risk-vhigh">Risco Muito Alto</span><span class="strat-badge return-badge">Retorno Muito Alto</span><span class="strat-badge time-badge">Horas a Dias</span></div>
                     <div class="strat-pnl neutral" id="strat-lev-pnl">$0.00</div>
                     <div class="strat-capital"><div class="strat-cap-item"><span class="strat-cap-label">Capital</span><span class="strat-cap-value" id="strat-lev-cap" style="color:var(--yellow)">$100.00</span></div><div class="strat-cap-item"><span class="strat-cap-label">Investido</span><span class="strat-cap-value" id="strat-lev-inv">$0.00</span></div><div class="strat-cap-item"><span class="strat-cap-label">Ganhos</span><span class="strat-cap-value" id="strat-lev-gain" style="color:var(--green)">$0.00</span></div><div class="strat-cap-item"><span class="strat-cap-label">Perdas</span><span class="strat-cap-value" id="strat-lev-loss" style="color:var(--red)">$0.00</span></div><div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Hoje</span><span class="strat-cap-value" id="strat-lev-today">$0.00</span></div></div>
                     <div class="strat-stats"><div class="strat-stat-row"><span class="strat-stat-label">Trades</span><span class="strat-stat-value" id="strat-lev-trades">0</span></div><div class="strat-stat-row"><span class="strat-stat-label">Win Rate</span><span class="strat-stat-value" id="strat-lev-wr">0%</span></div><div class="strat-winrate-bar"><div class="strat-winrate-fill" id="strat-lev-wrbar" style="width:0%;background:var(--red)"></div></div><div class="strat-stat-row"><span class="strat-stat-label">Liquidacoes</span><span class="strat-stat-value" id="strat-lev-liq" style="color:var(--red)">0</span></div></div>
                     <div class="strat-recent"><div class="strat-recent-title">Ultimas Posicoes</div><div id="strat-lev-recent"></div></div>
+                    <button class="strat-toggle-btn running" id="strat-lev-btn" onclick="toggleStrategy('leverage')">Parar</button>
                 </div>
             </div>
         </div>
@@ -1167,16 +1182,35 @@ function updateDashboard(data) {
 // ============================================================
 function updateStrategies(strats){
     function setCap(prefix,cap){if(!cap)return;setText(prefix+'-cap','$'+cap.current.toFixed(2));setText(prefix+'-inv','$'+cap.total_invested.toFixed(2));setText(prefix+'-gain','$'+cap.total_gains.toFixed(2));setText(prefix+'-loss','$'+cap.total_losses.toFixed(2));var te=document.getElementById(prefix+'-today');if(te){te.textContent=(cap.today_pnl>=0?'+$':'-$')+Math.abs(cap.today_pnl).toFixed(2);te.style.color=cap.today_pnl>=0?'var(--green)':'var(--red)';}}
+    function setPaused(cardId,btnId,paused){const card=document.getElementById(cardId);const btn=document.getElementById(btnId);if(card){if(paused){card.classList.add('is-paused');}else{card.classList.remove('is-paused');}}if(btn){btn.textContent=paused?'Continuar':'Parar';btn.className='strat-toggle-btn '+(paused?'paused':'running');}}
     if(strats.sniper){const s=strats.sniper.stats||{},c=strats.sniper.capital||{};setPnl('strat-sniper-pnl',c.pnl_usd||0,false);setCap('strat-sniper',c);setText('strat-sniper-trades',s.total_snipes||0);setText('strat-sniper-wr',(s.win_rate||0).toFixed(0)+'%');setBar('strat-sniper-wrbar',s.win_rate||0);setText('strat-sniper-rug',s.rugged||0);setRecent('strat-sniper-recent',(strats.sniper.recent_targets||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.name}</span><span class="strat-recent-pnl" style="color:${t.pnl_pct>=0?'var(--green)':'var(--red)'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</span></div>`);}
     if(strats.memecoin){const s=strats.memecoin.stats||{},c=strats.memecoin.capital||{};setPnl('strat-meme-pnl',c.pnl_usd||0,false);setCap('strat-meme',c);setText('strat-meme-trades',s.total_trades||0);setText('strat-meme-wr',(s.win_rate||0).toFixed(0)+'%');setBar('strat-meme-wrbar',s.win_rate||0);setText('strat-meme-momentum',s.high_momentum_count||0);setRecent('strat-meme-recent',(strats.memecoin.recent_signals||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.name}</span><span class="strat-recent-pnl" style="color:${t.pnl_pct>=0?'var(--green)':'var(--red)'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</span></div>`);}
     if(strats.arbitrage){const s=strats.arbitrage.stats||{},c=strats.arbitrage.capital||{};setPnl('strat-arb-pnl',c.pnl_usd||0,false);setCap('strat-arb',c);setText('strat-arb-trades',s.executed||0);setText('strat-arb-spread',(s.avg_spread_pct||0).toFixed(3)+'%');setBar('strat-arb-wrbar',s.executed>0?((s.executed/(s.executed+s.failed+s.missed||1))*100):0);setText('strat-arb-perhr','$'+(s.profit_per_hour||0).toFixed(2));setRecent('strat-arb-recent',(strats.arbitrage.recent_opportunities||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.token} ${t.buy_dex}>${t.sell_dex}</span><span class="strat-recent-pnl" style="color:${t.profit>=0?'var(--green)':'var(--red)'}">$${t.profit.toFixed(3)}</span></div>`);}
     if(strats.scalping){const s=strats.scalping.stats||{},c=strats.scalping.capital||{};setPnl('strat-scalp-pnl',c.pnl_usd||0,false);setCap('strat-scalp',c);setText('strat-scalp-trades',s.total_trades||0);setText('strat-scalp-wr',(s.win_rate||0).toFixed(0)+'%');setBar('strat-scalp-wrbar',s.win_rate||0);setText('strat-scalp-sharpe',(s.sharpe_estimate||0).toFixed(1));setRecent('strat-scalp-recent',(strats.scalping.recent_trades||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.token} ${t.direction}</span><span class="strat-recent-pnl" style="color:${t.pnl_pct>=0?'var(--green)':'var(--red)'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct.toFixed(2)}%</span></div>`);}
     if(strats.leverage){const s=strats.leverage.stats||{},c=strats.leverage.capital||{};setPnl('strat-lev-pnl',c.pnl_usd||0,false);setCap('strat-lev',c);setText('strat-lev-trades',s.total_trades||0);setText('strat-lev-wr',(s.win_rate||0).toFixed(0)+'%');setBar('strat-lev-wrbar',s.win_rate||0);setText('strat-lev-liq',s.liquidations||0);setRecent('strat-lev-recent',(strats.leverage.recent_positions||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.token} ${t.direction} ${t.leverage}</span><span class="strat-recent-pnl" style="color:${t.pnl_pct>=0?'var(--green)':'var(--red)'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</span></div>`);}
+    // Update pause states
+    if(strats.sniper)setPaused('strat-sniper','strat-sniper-btn',!!strats.sniper.paused);
+    if(strats.memecoin)setPaused('strat-memecoin','strat-meme-btn',!!strats.memecoin.paused);
+    if(strats.arbitrage)setPaused('strat-arbitrage','strat-arb-btn',!!strats.arbitrage.paused);
+    if(strats.scalping)setPaused('strat-scalping','strat-scalp-btn',!!strats.scalping.paused);
+    if(strats.leverage)setPaused('strat-leverage','strat-lev-btn',!!strats.leverage.paused);
 }
 function setPnl(id,val,isPct){const el=document.getElementById(id);if(!el)return;const txt=isPct?((val>=0?'+':'')+val.toFixed(1)+'%'):((val>=0?'+$':'-$')+Math.abs(val).toFixed(2));el.textContent=txt;el.className='strat-pnl '+(val>0?'profit':val<0?'loss':'neutral');}
 function setText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
 function setBar(id,pct){const el=document.getElementById(id);if(!el)return;el.style.width=Math.min(100,Math.max(0,pct))+'%';el.style.background=pct>=60?'var(--green)':pct>=40?'var(--yellow)':'var(--red)';}
 function setRecent(id,items,renderer){const el=document.getElementById(id);if(!el||!items.length)return;el.innerHTML=items.map(renderer).join('');}
+async function toggleStrategy(key){
+    try{
+        const resp=await fetch('/api/toggle-strategy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:key})});
+        const data=await resp.json();
+        if(data.ok){
+            const map={sniper:['strat-sniper','strat-sniper-btn'],memecoin:['strat-memecoin','strat-meme-btn'],arbitrage:['strat-arbitrage','strat-arb-btn'],scalping:['strat-scalping','strat-scalp-btn'],leverage:['strat-leverage','strat-lev-btn']};
+            const ids=map[key];if(ids){const card=document.getElementById(ids[0]);
+            if(data.paused){card.classList.add('is-paused');}else{card.classList.remove('is-paused');}
+            const btn=document.getElementById(ids[1]);if(btn){btn.textContent=data.paused?'Continuar':'Parar';btn.className='strat-toggle-btn '+(data.paused?'paused':'running');}}
+        }
+    }catch(e){console.error('Toggle error:',e);}
+}
 // Tooltip positioning - move to body so overflow:hidden won't clip
 (function(){
     document.querySelectorAll('.strat-help').forEach(function(helpBtn){
@@ -1446,6 +1480,7 @@ class DashboardServer:
         self.app = web.Application()
         self.app.router.add_get('/', self.handle_index)
         self.app.router.add_get('/api/status', self.handle_status)
+        self.app.router.add_post('/api/toggle-strategy', self.handle_toggle_strategy)
         self.app.router.add_get('/ws', self.handle_websocket)
         self.logs = []
         self.max_logs = 100
@@ -1503,6 +1538,17 @@ class DashboardServer:
             return web.json_response(data)
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
+
+    async def handle_toggle_strategy(self, request):
+        try:
+            data = await request.json()
+            key = data.get("strategy", "")
+            if hasattr(self.bot, 'strategies'):
+                paused = self.bot.strategies.toggle_strategy(key)
+                return web.json_response({"ok": True, "strategy": key, "paused": paused})
+            return web.json_response({"error": "strategies not available"}, status=500)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=400)
 
     # --------------------------------------------------------
     # WEBSOCKET

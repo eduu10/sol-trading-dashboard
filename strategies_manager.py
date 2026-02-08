@@ -21,6 +21,8 @@ logger = logging.getLogger("StrategiesManager")
 class StrategiesManager:
     """Gerencia as 5 estrategias de day trade em modo teste."""
 
+    STRATEGY_KEYS = ["sniper", "memecoin", "arbitrage", "scalping", "leverage"]
+
     def __init__(self):
         self.sniper = SnipingStrategy()
         self.memecoin = MemeCoinStrategy()
@@ -36,50 +38,72 @@ class StrategiesManager:
             self.leverage,
         ]
 
+        # Estado pausado por estrategia
+        self.paused = {k: False for k in self.STRATEGY_KEYS}
+
+    def toggle_strategy(self, key: str) -> bool:
+        """Alterna pausa de uma estrategia. Retorna novo estado (True=pausado)."""
+        if key in self.paused:
+            self.paused[key] = not self.paused[key]
+            logger.info(f"Strategy '{key}' {'PAUSADA' if self.paused[key] else 'RETOMADA'}")
+            return self.paused[key]
+        return False
+
     async def run_simulation_cycle(self) -> Dict:
-        """Roda um ciclo de simulacao para todas as estrategias."""
+        """Roda um ciclo de simulacao para todas as estrategias (pula pausadas)."""
         results = {}
-        try:
-            data1 = await self.sniper.simulate_monitoring()
-            results["sniper"] = data1
-        except Exception as e:
-            logger.debug(f"Sniper sim error: {e}")
 
-        try:
-            data2 = await self.memecoin.simulate_analysis()
-            results["memecoin"] = data2
-        except Exception as e:
-            logger.debug(f"Memecoin sim error: {e}")
+        if not self.paused.get("sniper"):
+            try:
+                data1 = await self.sniper.simulate_monitoring()
+                results["sniper"] = data1
+            except Exception as e:
+                logger.debug(f"Sniper sim error: {e}")
 
-        try:
-            data3 = await self.arbitrage.simulate_scan()
-            results["arbitrage"] = data3
-        except Exception as e:
-            logger.debug(f"Arbitrage sim error: {e}")
+        if not self.paused.get("memecoin"):
+            try:
+                data2 = await self.memecoin.simulate_analysis()
+                results["memecoin"] = data2
+            except Exception as e:
+                logger.debug(f"Memecoin sim error: {e}")
 
-        try:
-            data4 = await self.scalping.simulate_scalp()
-            results["scalping"] = data4
-        except Exception as e:
-            logger.debug(f"Scalping sim error: {e}")
+        if not self.paused.get("arbitrage"):
+            try:
+                data3 = await self.arbitrage.simulate_scan()
+                results["arbitrage"] = data3
+            except Exception as e:
+                logger.debug(f"Arbitrage sim error: {e}")
 
-        try:
-            data5 = await self.leverage.simulate_leverage_trade()
-            results["leverage"] = data5
-        except Exception as e:
-            logger.debug(f"Leverage sim error: {e}")
+        if not self.paused.get("scalping"):
+            try:
+                data4 = await self.scalping.simulate_scalp()
+                results["scalping"] = data4
+            except Exception as e:
+                logger.debug(f"Scalping sim error: {e}")
+
+        if not self.paused.get("leverage"):
+            try:
+                data5 = await self.leverage.simulate_leverage_trade()
+                results["leverage"] = data5
+            except Exception as e:
+                logger.debug(f"Leverage sim error: {e}")
 
         return results
 
     def get_all_dashboard_data(self) -> Dict:
         """Retorna dados de todas as estrategias para o dashboard."""
-        return {
+        data = {
             "sniper": self.sniper.get_dashboard_data(),
             "memecoin": self.memecoin.get_dashboard_data(),
             "arbitrage": self.arbitrage.get_dashboard_data(),
             "scalping": self.scalping.get_dashboard_data(),
             "leverage": self.leverage.get_dashboard_data(),
         }
+        # Adiciona estado pausado a cada estrategia
+        for key in self.STRATEGY_KEYS:
+            if key in data:
+                data[key]["paused"] = self.paused.get(key, False)
+        return data
 
     def get_summary(self) -> Dict:
         """Retorna resumo comparativo das estrategias."""

@@ -60,10 +60,10 @@ CLOUD_DASHBOARD_URL = os.environ.get("CLOUD_DASHBOARD_URL", "https://sol-trading
 CLOUD_API_KEY = os.environ.get("DASHBOARD_API_KEY", "sol-trading-2026")
 
 
-async def push_to_cloud(data: dict):
-    """Envia dados do bot para o dashboard na nuvem via POST."""
+async def push_to_cloud(data: dict) -> list:
+    """Envia dados do bot para o dashboard na nuvem via POST. Retorna comandos pendentes."""
     if not CLOUD_DASHBOARD_URL:
-        return
+        return []
     try:
         import httpx
         async with httpx.AsyncClient(timeout=10) as client:
@@ -72,10 +72,14 @@ async def push_to_cloud(data: dict):
                 json=data,
                 headers={"X-API-Key": CLOUD_API_KEY},
             )
-            if resp.status_code != 200:
+            if resp.status_code == 200:
+                result = resp.json()
+                return result.get("commands", [])
+            else:
                 logger.debug(f"Cloud push failed: {resp.status_code}")
     except Exception as e:
         logger.debug(f"Cloud push error: {e}")
+    return []
 
 
 # ============================================================
@@ -794,7 +798,12 @@ class TelegramBot:
                 "strategies": self.strategies.get_all_dashboard_data(),
                 "wallet": wallet_data,
             }
-            await push_to_cloud(cloud_data)
+            commands = await push_to_cloud(cloud_data)
+            # Processa comandos do dashboard na nuvem
+            for cmd in commands:
+                if cmd.get("action") == "toggle_strategy":
+                    key = cmd.get("strategy", "")
+                    self.strategies.toggle_strategy(key)
         except Exception as e:
             logger.debug(f"Cloud push prep error: {e}")
 

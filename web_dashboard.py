@@ -38,6 +38,9 @@ BOT_DATA = {
     "last_push": 0,
 }
 
+# Comandos pendentes para o bot (o bot le na resposta do push)
+PENDING_COMMANDS = []
+
 # Secret key para o bot enviar dados (evita spam)
 API_KEY = os.environ.get("DASHBOARD_API_KEY", "sol-trading-2026")
 
@@ -395,6 +398,16 @@ def get_dashboard_html():
         .strat-winrate-fill { height: 100%; border-radius: 2px; transition: width 1s ease; }
         .strat-recent { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-color); max-height: 0; overflow: hidden; transition: max-height 0.4s ease; }
         .strat-card:hover .strat-recent { max-height: 200px; }
+        .strat-toggle-btn { width: 100%; margin-top: 12px; padding: 8px 0; border: 1px solid var(--border-color); border-radius: 8px; background: rgba(255,255,255,0.03); color: var(--text-secondary); font-size: 0.75em; font-weight: 600; letter-spacing: 0.5px; cursor: pointer; transition: all 0.3s; text-transform: uppercase; }
+        .strat-toggle-btn:hover { background: rgba(255,255,255,0.08); border-color: var(--border-glow); }
+        .strat-toggle-btn.running { color: var(--red); border-color: rgba(255,68,102,0.3); }
+        .strat-toggle-btn.running:hover { background: rgba(255,68,102,0.1); }
+        .strat-toggle-btn.paused { color: var(--green); border-color: rgba(0,255,136,0.3); }
+        .strat-toggle-btn.paused:hover { background: rgba(0,255,136,0.1); }
+        .strat-card.is-paused { opacity: 0.5; }
+        .strat-card.is-paused .strat-pnl { color: var(--text-muted) !important; }
+        .strat-paused-badge { display: none; font-size: 0.6em; color: var(--red); background: rgba(255,68,102,0.1); border: 1px solid rgba(255,68,102,0.2); padding: 2px 8px; border-radius: 4px; font-weight: 600; letter-spacing: 0.5px; margin-left: auto; }
+        .strat-card.is-paused .strat-paused-badge { display: inline-block; }
         .strat-recent-title { font-size: 0.65em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
         .strat-recent-item { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; font-size: 0.72em; font-family: 'JetBrains Mono', monospace; }
         .strat-recent-name { color: var(--text-secondary); }
@@ -539,6 +552,7 @@ def get_dashboard_html():
                 <div class="strat-card risk-alto" id="strat-sniper">
                     <div class="strat-header">
                         <div class="strat-name">Sniping Pump.fun</div>
+                        <span class="strat-paused-badge">PAUSADO</span>
                         <div class="strat-help">?
                             <div class="strat-tooltip">
                                 <div class="strat-tooltip-title">Sniping de Novos Tokens</div>
@@ -570,11 +584,13 @@ def get_dashboard_html():
                         <div class="strat-recent-title">Ultimos Snipes</div>
                         <div id="strat-sniper-recent"></div>
                     </div>
+                    <button class="strat-toggle-btn running" id="strat-sniper-btn" onclick="toggleStrategy('sniper')">Parar</button>
                 </div>
                 <!-- 2. Meme Coins -->
                 <div class="strat-card risk-alto" id="strat-memecoin">
                     <div class="strat-header">
                         <div class="strat-name">Meme Coins Liquidez</div>
+                        <span class="strat-paused-badge">PAUSADO</span>
                         <div class="strat-help">?
                             <div class="strat-tooltip">
                                 <div class="strat-tooltip-title">Trading de Meme Coins</div>
@@ -606,11 +622,13 @@ def get_dashboard_html():
                         <div class="strat-recent-title">Ultimos Sinais</div>
                         <div id="strat-meme-recent"></div>
                     </div>
+                    <button class="strat-toggle-btn running" id="strat-meme-btn" onclick="toggleStrategy('memecoin')">Parar</button>
                 </div>
                 <!-- 3. Arbitragem -->
                 <div class="strat-card risk-medio" id="strat-arbitrage">
                     <div class="strat-header">
                         <div class="strat-name">Arbitragem DEX</div>
+                        <span class="strat-paused-badge">PAUSADO</span>
                         <div class="strat-help">?
                             <div class="strat-tooltip">
                                 <div class="strat-tooltip-title">Arbitragem entre DEXs</div>
@@ -642,11 +660,13 @@ def get_dashboard_html():
                         <div class="strat-recent-title">Ultimas Oportunidades</div>
                         <div id="strat-arb-recent"></div>
                     </div>
+                    <button class="strat-toggle-btn running" id="strat-arb-btn" onclick="toggleStrategy('arbitrage')">Parar</button>
                 </div>
                 <!-- 4. Scalping -->
                 <div class="strat-card risk-medio-baixo" id="strat-scalping">
                     <div class="strat-header">
                         <div class="strat-name">Scalping Tokens</div>
+                        <span class="strat-paused-badge">PAUSADO</span>
                         <div class="strat-help">?
                             <div class="strat-tooltip">
                                 <div class="strat-tooltip-title">Scalping em Tokens Estabelecidos</div>
@@ -678,11 +698,13 @@ def get_dashboard_html():
                         <div class="strat-recent-title">Ultimos Trades</div>
                         <div id="strat-scalp-recent"></div>
                     </div>
+                    <button class="strat-toggle-btn running" id="strat-scalp-btn" onclick="toggleStrategy('scalping')">Parar</button>
                 </div>
                 <!-- 5. Leverage -->
                 <div class="strat-card risk-muito-alto" id="strat-leverage">
                     <div class="strat-header">
                         <div class="strat-name">Leverage Trading</div>
+                        <span class="strat-paused-badge">PAUSADO</span>
                         <div class="strat-help">?
                             <div class="strat-tooltip">
                                 <div class="strat-tooltip-title">Leverage Trading em DEX</div>
@@ -714,6 +736,7 @@ def get_dashboard_html():
                         <div class="strat-recent-title">Ultimas Posicoes</div>
                         <div id="strat-lev-recent"></div>
                     </div>
+                    <button class="strat-toggle-btn running" id="strat-lev-btn" onclick="toggleStrategy('leverage')">Parar</button>
                 </div>
             </div>
         </div>
@@ -832,6 +855,12 @@ function updateStrategies(strats){
         var te=document.getElementById(prefix+'-today');
         if(te){te.textContent=(cap.today_pnl>=0?'+$':'-$')+Math.abs(cap.today_pnl).toFixed(2);te.style.color=cap.today_pnl>=0?'var(--green)':'var(--red)';}
     }
+    function setPaused(cardId,btnId,paused){
+        const card=document.getElementById(cardId);
+        const btn=document.getElementById(btnId);
+        if(card){if(paused){card.classList.add('is-paused');}else{card.classList.remove('is-paused');}}
+        if(btn){btn.textContent=paused?'Continuar':'Parar';btn.className='strat-toggle-btn '+(paused?'paused':'running');}
+    }
     // 1. Sniper
     if(strats.sniper){const s=strats.sniper.stats||{},c=strats.sniper.capital||{};
         setPnl('strat-sniper-pnl',c.pnl_usd||0,false);
@@ -882,11 +911,30 @@ function updateStrategies(strats){
         setText('strat-lev-liq',s.liquidations||0);
         setRecent('strat-lev-recent',(strats.leverage.recent_positions||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.token} ${t.direction} ${t.leverage}</span><span class="strat-recent-pnl" style="color:${t.pnl_pct>=0?'var(--green)':'var(--red)'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</span></div>`);
     }
+    // Update pause states
+    if(strats.sniper)setPaused('strat-sniper','strat-sniper-btn',!!strats.sniper.paused);
+    if(strats.memecoin)setPaused('strat-memecoin','strat-meme-btn',!!strats.memecoin.paused);
+    if(strats.arbitrage)setPaused('strat-arbitrage','strat-arb-btn',!!strats.arbitrage.paused);
+    if(strats.scalping)setPaused('strat-scalping','strat-scalp-btn',!!strats.scalping.paused);
+    if(strats.leverage)setPaused('strat-leverage','strat-lev-btn',!!strats.leverage.paused);
 }
 function setPnl(id,val,isPct){const el=document.getElementById(id);if(!el)return;const txt=isPct?((val>=0?'+':'')+val.toFixed(1)+'%'):((val>=0?'+$':'-$')+Math.abs(val).toFixed(2));el.textContent=txt;el.className='strat-pnl '+(val>0?'profit':val<0?'loss':'neutral');}
 function setText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
 function setBar(id,pct){const el=document.getElementById(id);if(!el)return;el.style.width=Math.min(100,Math.max(0,pct))+'%';el.style.background=pct>=60?'var(--green)':pct>=40?'var(--yellow)':'var(--red)';}
 function setRecent(id,items,renderer){const el=document.getElementById(id);if(!el||!items.length)return;el.innerHTML=items.map(renderer).join('');}
+async function toggleStrategy(key){
+    try{
+        const resp=await fetch('/api/toggle-strategy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:key})});
+        const data=await resp.json();
+        if(data.ok){
+            // Feedback visual imediato enquanto espera o bot confirmar
+            const map={sniper:['strat-sniper','strat-sniper-btn'],memecoin:['strat-memecoin','strat-meme-btn'],arbitrage:['strat-arbitrage','strat-arb-btn'],scalping:['strat-scalping','strat-scalp-btn'],leverage:['strat-leverage','strat-lev-btn']};
+            const ids=map[key];if(ids){const card=document.getElementById(ids[0]);const isPaused=card&&card.classList.contains('is-paused');
+            if(card){card.classList.toggle('is-paused');}
+            const btn=document.getElementById(ids[1]);if(btn){btn.textContent=isPaused?'Parar':'Continuar';btn.className='strat-toggle-btn '+(isPaused?'running':'paused');}}
+        }
+    }catch(e){console.error('Toggle error:',e);}
+}
 // Tooltip system: move all tooltips to body so overflow:hidden on cards won't clip
 (function(){
     document.querySelectorAll('.strat-help').forEach(function(helpBtn){
@@ -1013,7 +1061,24 @@ async def handle_push_data(request):
         data = await request.json()
         BOT_DATA.update(data)
         BOT_DATA["last_push"] = time.time()
-        return web.json_response({"ok": True})
+        # Retorna comandos pendentes para o bot
+        cmds = list(PENDING_COMMANDS)
+        PENDING_COMMANDS.clear()
+        return web.json_response({"ok": True, "commands": cmds})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=400)
+
+
+async def handle_toggle_strategy(request):
+    """Toggle pause/resume de uma estrategia via dashboard."""
+    try:
+        data = await request.json()
+        key = data.get("strategy", "")
+        valid_keys = ["sniper", "memecoin", "arbitrage", "scalping", "leverage"]
+        if key not in valid_keys:
+            return web.json_response({"error": "invalid strategy"}, status=400)
+        PENDING_COMMANDS.append({"action": "toggle_strategy", "strategy": key})
+        return web.json_response({"ok": True, "strategy": key, "queued": True})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=400)
 
@@ -1030,6 +1095,7 @@ def create_app():
     app.router.add_get('/', handle_index)
     app.router.add_get('/api/data', handle_get_data)
     app.router.add_post('/api/push', handle_push_data)
+    app.router.add_post('/api/toggle-strategy', handle_toggle_strategy)
     app.router.add_get('/health', handle_health)
     return app
 
