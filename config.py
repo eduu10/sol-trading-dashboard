@@ -124,7 +124,7 @@ GECKO_POOL_ADDRESS = "FpCMFDFGYotvufJ7HrFHsWEiiQCGbkLCtwHiDnh7o28Q"
 # OPERAÇÃO
 # ============================================================
 PAPER_TRADING = True               # SEMPRE comece em True!
-LOOP_INTERVAL_SECONDS = 45         # Intervalo entre análises (evita rate limit)
+LOOP_INTERVAL_SECONDS = 60         # Intervalo entre análises (evita rate limit)
 LOG_FILE = "trading_bot.log"
 LOG_LEVEL = "INFO"
 

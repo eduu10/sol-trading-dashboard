@@ -174,7 +174,7 @@ class PriceDataFetcher:
             df = await self.fetch_ohlcv(tf_value)
             if not df.empty:
                 data[tf_name] = df
-            await asyncio.sleep(3.0)  # Rate limit GeckoTerminal (~30 req/min)
+            await asyncio.sleep(5.0)  # Rate limit GeckoTerminal (~30 req/min)
 
         return data
 
@@ -183,13 +183,13 @@ class PriceDataFetcher:
     # --------------------------------------------------------
     async def get_current_price(self) -> float:
         """Retorna preço atual do token de trade."""
-        # 1. GeckoTerminal
-        price = await self.fetch_gecko_price()
+        # 1. DexScreener (primário - mais generoso no rate limit)
+        price = await self.fetch_dexscreener_price()
         if price and price > 0:
             return price
 
-        # 2. Fallback: DexScreener
-        price = await self.fetch_dexscreener_price()
+        # 2. Fallback: GeckoTerminal
+        price = await self.fetch_gecko_price()
         if price and price > 0:
             return price
 

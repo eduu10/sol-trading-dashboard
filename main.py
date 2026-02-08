@@ -48,7 +48,7 @@ logger = logging.getLogger("TradingBot")
 # CLOUD DASHBOARD PUSH CONFIG
 # ============================================================
 # URL do dashboard no Render (preencha apos deploy)
-CLOUD_DASHBOARD_URL = os.environ.get("CLOUD_DASHBOARD_URL", "")
+CLOUD_DASHBOARD_URL = os.environ.get("CLOUD_DASHBOARD_URL", "https://sol-trading-dashboard.onrender.com")
 CLOUD_API_KEY = os.environ.get("DASHBOARD_API_KEY", "sol-trading-2026")
 
 
@@ -387,6 +387,7 @@ class TelegramBot:
     async def _run_analysis(self):
         """Executa uma rodada de análise."""
         self.analysis_count += 1
+        self.last_price = 0.0
         token_address = config.TOKENS[config.TRADE_TOKEN]
 
         # 1. Busca dados multi-timeframe
@@ -424,8 +425,11 @@ class TelegramBot:
             data["execution"]
         )
 
-        # 4. Preço atual
-        current_price = await self.price_fetcher.get_current_price()
+        # 4. Preço atual (usa último candle se possível, senão busca)
+        current_price = float(data["execution"].iloc[-1]["close"]) if not data["execution"].empty else 0.0
+        if current_price <= 0:
+            current_price = await self.price_fetcher.get_current_price()
+        self.last_price = current_price
 
         # 5. Verifica posições existentes (SL/TP)
         events = await self.executor.check_positions(current_price)
@@ -564,7 +568,7 @@ class TelegramBot:
         while self.running:
             try:
                 await self._run_analysis()
-                price = await self.price_fetcher.get_current_price()
+                price = self.last_price if hasattr(self, 'last_price') and self.last_price > 0 else 0.0
                 logger.info(f"💲 {config.TRADE_TOKEN}: ${price:,.2f}")
                 self.dashboard.add_log(f"Preco: ${price:,.2f}")
             except Exception as e:
