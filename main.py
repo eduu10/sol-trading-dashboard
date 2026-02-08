@@ -902,7 +902,7 @@ class TelegramBot:
                 )
 
         except Exception as e:
-            logger.debug(f"Real trade execution error: {e}")
+            logger.error(f"Real trade execution error: {e}", exc_info=True)
 
         # Atualiza saldo da carteira Phantom (read-only)
         wallet_data = {}
