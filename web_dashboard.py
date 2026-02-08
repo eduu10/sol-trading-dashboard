@@ -29,6 +29,10 @@ AUTH_PASS_HASH = hashlib.sha256(
 SESSIONS = {}  # token -> {"user": str, "created": float}
 SESSION_MAX_AGE = 86400 * 7  # 7 dias
 
+# Persistent storage path (survives process restarts within same deploy)
+PERSIST_DIR = os.environ.get("PERSIST_DIR", "/tmp/dashboard_data")
+PERSIST_FILE = os.path.join(PERSIST_DIR, "state.json")
+
 # Dados compartilhados (in-memory)
 BOT_DATA = {
     "price": 0,
@@ -55,6 +59,51 @@ PENDING_COMMANDS = []
 
 # Secret key para o bot enviar dados (evita spam)
 API_KEY = os.environ.get("DASHBOARD_API_KEY", "sol-trading-2026")
+
+
+def _save_persistent_state():
+    """Salva estado critico em disco (sobrevive restarts do processo)."""
+    try:
+        os.makedirs(PERSIST_DIR, exist_ok=True)
+        state = {
+            "pending_settings": BOT_DATA.get("pending_settings"),
+            "pending_commands": PENDING_COMMANDS[:],
+            "sessions": {k: v for k, v in SESSIONS.items()
+                         if time.time() - v.get("created", 0) < SESSION_MAX_AGE},
+        }
+        with open(PERSIST_FILE, "w") as f:
+            json.dump(state, f)
+    except Exception as e:
+        logger.warning(f"Failed to save persistent state: {e}")
+
+
+def _load_persistent_state():
+    """Carrega estado salvo em disco."""
+    global PENDING_COMMANDS, SESSIONS
+    try:
+        with open(PERSIST_FILE) as f:
+            state = json.load(f)
+        ps = state.get("pending_settings")
+        if ps:
+            BOT_DATA["pending_settings"] = ps
+        cmds = state.get("pending_commands", [])
+        if cmds:
+            PENDING_COMMANDS.extend(cmds)
+        saved_sessions = state.get("sessions", {})
+        for k, v in saved_sessions.items():
+            if time.time() - v.get("created", 0) < SESSION_MAX_AGE:
+                SESSIONS[k] = v
+        logger.info(f"Loaded persistent state: {len(saved_sessions)} sessions, "
+                     f"pending_settings={'yes' if ps else 'no'}, "
+                     f"{len(cmds)} pending commands")
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    except Exception as e:
+        logger.warning(f"Failed to load persistent state: {e}")
+
+
+# Load saved state on startup
+_load_persistent_state()
 
 
 # ============================================================
@@ -1566,6 +1615,7 @@ async def handle_login_post(request):
         expired = [k for k, v in SESSIONS.items() if now - v["created"] > SESSION_MAX_AGE]
         for k in expired:
             SESSIONS.pop(k, None)
+        _save_persistent_state()
         resp = web.HTTPFound("/")
         resp.set_cookie("session", token, max_age=SESSION_MAX_AGE, httponly=True, samesite="Lax")
         raise resp
@@ -1616,6 +1666,7 @@ async def handle_push_data(request):
         ps = BOT_DATA.get("pending_settings")
         if ps and not any(c.get("action") == "save_settings" for c in cmds):
             cmds.append(ps)
+        _save_persistent_state()
         return web.json_response({"ok": True, "commands": cmds})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=400)
@@ -1632,6 +1683,7 @@ async def handle_toggle_strategy(request):
         if key not in valid_keys:
             return web.json_response({"error": "invalid strategy"}, status=400)
         PENDING_COMMANDS.append({"action": "toggle_strategy", "strategy": key})
+        _save_persistent_state()
         return web.json_response({"ok": True, "strategy": key, "queued": True})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=400)
@@ -1657,6 +1709,7 @@ async def handle_allocate_strategy(request):
             "amount": amount,
             "coin": coin,
         })
+        _save_persistent_state()
         return web.json_response({"ok": True, "strategy": key, "amount": amount, "coin": coin, "queued": True})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=400)
@@ -1676,6 +1729,7 @@ async def handle_deallocate_strategy(request):
             "action": "deallocate_strategy",
             "strategy": key,
         })
+        _save_persistent_state()
         return web.json_response({"ok": True, "strategy": key, "queued": True})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=400)
@@ -1698,6 +1752,7 @@ async def handle_save_settings(request):
         # Guarda tanto na fila normal quanto em BOT_DATA (persiste ate bot pegar)
         PENDING_COMMANDS.append(cmd)
         BOT_DATA["pending_settings"] = cmd
+        _save_persistent_state()
         return web.json_response({"ok": True, "queued": True})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=400)
