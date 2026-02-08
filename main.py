@@ -753,8 +753,8 @@ class TelegramBot:
 
             # Auto-funding: se tem sinais e pouco USDC, converte SOL->USDC
             if signals and not config.PAPER_TRADING:
-                usdc_bal = self.wallet_monitor.last_usdc_balance if self.wallet_monitor else 0
-                sol_bal = self.wallet_monitor.last_sol_balance if self.wallet_monitor else 0
+                usdc_bal = self.wallet.last_usdc_balance if self.wallet else 0
+                sol_bal = self.wallet.last_sol_balance if self.wallet else 0
                 total_needed = sum(s["amount_usd"] for s in signals)
                 if usdc_bal < total_needed and sol_bal > 0.01:
                     fund_usd = total_needed - usdc_bal + 0.01  # pequena margem
@@ -781,9 +781,9 @@ class TelegramBot:
                                     f"[MODO REAL] Auto-funding OK: +${funded:.4f} USDC | TX: {fund_tx}"
                                 )
                                 # Atualiza saldo USDC em memoria
-                                if self.wallet_monitor:
-                                    self.wallet_monitor.last_usdc_balance += funded
-                                    self.wallet_monitor.last_sol_balance -= sol_to_sell
+                                if self.wallet:
+                                    self.wallet.last_usdc_balance += funded
+                                    self.wallet.last_sol_balance -= sol_to_sell
                             else:
                                 logger.warning("[MODO REAL] Auto-funding: falha no swap SOL->USDC")
                         else:
