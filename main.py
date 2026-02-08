@@ -100,23 +100,22 @@ class TelegramBot:
     # --------------------------------------------------------
     async def send_message(self, text: str, parse_mode: str = "Markdown",
                            reply_markup: Dict = None):
-        """Envia mensagem via Telegram."""
+        """Envia mensagem para todos os chat IDs configurados."""
         import httpx
         async with httpx.AsyncClient() as client:
-            data = {
-                "chat_id": config.TELEGRAM_CHAT_ID,
-                "text": text,
-                "parse_mode": parse_mode,
-            }
-            if reply_markup:
-                import json
-                data["reply_markup"] = json.dumps(reply_markup)
+            for chat_id in config.TELEGRAM_CHAT_IDS:
+                msg_data = {
+                    "chat_id": chat_id,
+                    "text": text,
+                    "parse_mode": parse_mode,
+                }
+                if reply_markup:
+                    msg_data["reply_markup"] = json.dumps(reply_markup)
 
-            try:
-                resp = await client.post(f"{self.base_url}/sendMessage", data=data)
-                return resp.json()
-            except Exception as e:
-                logger.error(f"Telegram send error: {e}")
+                try:
+                    resp = await client.post(f"{self.base_url}/sendMessage", data=msg_data)
+                except Exception as e:
+                    logger.error(f"Telegram send error (chat {chat_id}): {e}")
 
     async def get_updates(self):
         """Busca atualizações (mensagens) do Telegram."""
@@ -517,8 +516,8 @@ class TelegramBot:
                     text = msg.get("text", "")
                     chat_id = str(msg.get("chat", {}).get("id", ""))
 
-                    # Verifica se é o chat autorizado
-                    if config.TELEGRAM_CHAT_ID and chat_id != config.TELEGRAM_CHAT_ID:
+                    # Verifica se é um chat autorizado
+                    if config.TELEGRAM_CHAT_IDS and chat_id not in [str(c) for c in config.TELEGRAM_CHAT_IDS]:
                         continue
 
                     if text.startswith("/"):

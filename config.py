@@ -8,7 +8,7 @@ OTIMIZADO PARA LUCRO - SOL/USDC
 # TELEGRAM (opcional - funciona sem)
 # ============================================================
 TELEGRAM_BOT_TOKEN = ""          # Token do BotFather
-TELEGRAM_CHAT_ID = ""            # Seu chat ID
+TELEGRAM_CHAT_IDS = []           # Lista de chat IDs que recebem mensagens (ex: ["910559357", "123456789"])
 AUTHORIZED_USERS = []            # Lista de user IDs autorizados
 
 # ============================================================
