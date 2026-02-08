@@ -91,6 +91,7 @@ class TelegramBot:
         self.last_signal = None
         self.analysis_count = 0
         self.last_indicators = {}
+        self.last_hourly_price_hour = -1  # Track last hour we sent price update
 
         # Dashboard Web
         self.dashboard = DashboardServer(self)
@@ -426,6 +427,23 @@ class TelegramBot:
             current_price = await self.price_fetcher.get_current_price()
         self.last_price = current_price
 
+        # 4.1 Envia preço do SOL a cada hora no Telegram
+        current_hour = datetime.now().hour
+        if current_hour != self.last_hourly_price_hour and current_price > 0:
+            self.last_hourly_price_hour = current_hour
+            n_pos = len(self.executor.positions)
+            dash = self.executor.get_dashboard_data(current_price)
+            await self.send_message(
+                f"🕐 *ATUALIZAÇÃO HORÁRIA*\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"💲 SOL: *${current_price:,.2f}*\n"
+                f"💰 Capital: *${config.CAPITAL_USDC:,.2f}*\n"
+                f"📊 P&L Total: *${dash['total_pnl_usd']:+,.2f}*\n"
+                f"📈 Posições: {n_pos} | Trades: {dash['total_trades']}\n"
+                f"🔄 Análises: {self.analysis_count}\n"
+                f"⏰ {datetime.now().strftime('%H:%M - %d/%m/%Y')}\n"
+            )
+
         # 5. Monta relatório de análise (sempre mostra)
         direction_emoji = "🟢" if conf["direction"] == "long" else "🔴"
         confidence_pct = conf["confidence"] * 100
@@ -549,6 +567,7 @@ class TelegramBot:
                 }
             cloud_data = {
                 "price": current_price,
+                "capital": config.CAPITAL_USDC,
                 "mode": config.TRADE_MODE.replace("_", " ").title(),
                 "paper_trading": config.PAPER_TRADING,
                 "analysis_count": self.analysis_count,

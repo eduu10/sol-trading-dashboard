@@ -20,6 +20,7 @@ logger = logging.getLogger("WebDashboard")
 # Dados compartilhados (in-memory)
 BOT_DATA = {
     "price": 0,
+    "capital": 500.0,
     "mode": "Day Trade",
     "paper_trading": True,
     "analysis_count": 0,
@@ -294,6 +295,7 @@ def get_dashboard_html():
             <div class="card-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg> P&amp;L Total</div>
             <div class="pnl-value profit" id="total-pnl">$0.00</div>
             <div class="pnl-sub">
+                <div class="pnl-sub-item"><span class="pnl-sub-label">Capital</span><span class="pnl-sub-value" id="capital" style="color:var(--yellow)">$500.00</span></div>
                 <div class="pnl-sub-item"><span class="pnl-sub-label">Aberto</span><span class="pnl-sub-value" id="open-pnl">$0.00</span></div>
                 <div class="pnl-sub-item"><span class="pnl-sub-label">Win Rate</span><span class="pnl-sub-value" id="win-rate">N/A</span></div>
                 <div class="pnl-sub-item"><span class="pnl-sub-label">Trades</span><span class="pnl-sub-value" id="total-trades">0</span></div>
@@ -397,6 +399,7 @@ function updateDashboard(data) {
     opEl.textContent = (openPnl>=0?'+':'')+'$'+openPnl.toFixed(2); opEl.style.color = openPnl>=0?'var(--green)':'var(--red)';
     document.getElementById('win-rate').textContent = data.win_rate||'N/A';
     document.getElementById('total-trades').textContent = data.total_trades||'0';
+    if(data.capital){document.getElementById('capital').textContent='$'+data.capital.toFixed(2);}
     document.getElementById('analysis-count').textContent = data.analysis_count||'0';
     document.getElementById('open-positions').textContent = data.open_positions||'0';
     document.getElementById('trade-mode').textContent = (data.mode||'Day Trade').replace(' Trade','');
