@@ -199,10 +199,14 @@ class JupiterExecutor:
             raw_tx = base64.b64decode(swap_transaction)
             tx = VersionedTransaction.from_bytes(raw_tx)
 
-            # Sign (solders 0.27+: sign message then populate)
+            # Sign (solders 0.27+)
+            # Para MessageV0, bytes(msg) NÃO inclui o prefixo de versão 0x80
+            # mas a assinatura precisa cobrir a mensagem COM o prefixo.
+            # Extraímos os bytes da mensagem versionada diretamente do raw TX.
             keypair = Keypair.from_base58_string(config.SOLANA_PRIVATE_KEY)
-            msg_bytes = bytes(tx.message)
-            signature = keypair.sign_message(msg_bytes)
+            num_sigs = raw_tx[0]
+            versioned_msg_bytes = raw_tx[1 + num_sigs * 64:]  # pula [num_sigs_byte + signatures]
+            signature = keypair.sign_message(versioned_msg_bytes)
             signed_tx = VersionedTransaction.populate(tx.message, [signature])
 
             # Send
