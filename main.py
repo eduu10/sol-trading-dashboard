@@ -484,6 +484,7 @@ class TelegramBot:
             )
 
             # Envia saldo da carteira Phantom
+            wallet_data = self.wallet.get_data() if self.wallet else {}
             if self.wallet and wallet_data.get("connected"):
                 sol_bal = wallet_data.get("sol_balance", 0)
                 usdc_bal = wallet_data.get("usdc_balance", 0)
