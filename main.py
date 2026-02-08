@@ -35,6 +35,7 @@ from price_data import PriceDataFetcher
 from jupiter_executor import JupiterExecutor
 from dashboard import DashboardServer
 from learning_engine import LearningEngine
+from strategies_manager import StrategiesManager
 
 # ============================================================
 # LOGGING
@@ -104,6 +105,9 @@ class TelegramBot:
 
         # Dashboard Web
         self.dashboard = DashboardServer(self)
+
+        # Estrategias de teste (5 variacoes de day trade)
+        self.strategies = StrategiesManager()
 
     # --------------------------------------------------------
     # TELEGRAM API
@@ -667,6 +671,12 @@ class TelegramBot:
             else:
                 await self.send_message("❌ Erro ao executar trade. Verifique os logs.")
 
+        # Roda simulacao das 5 estrategias de teste
+        try:
+            await self.strategies.run_simulation_cycle()
+        except Exception as e:
+            logger.debug(f"Strategies simulation error: {e}")
+
         # Push para dashboard na nuvem
         try:
             dashboard = self.executor.get_dashboard_data(current_price)
@@ -711,6 +721,7 @@ class TelegramBot:
                     "total_analyses": self.learning.state.get("total_analyses", 0),
                 },
                 "analysis_history": self.analysis_history[-20:],
+                "strategies": self.strategies.get_all_dashboard_data(),
             }
             await push_to_cloud(cloud_data)
         except Exception as e:

@@ -536,6 +536,52 @@ DASHBOARD_HTML = r"""
             border-top: 1px solid var(--border-color);
             margin-top: 16px;
         }
+        /* ===== STRATEGY PANELS ===== */
+        .strategies-section { grid-column: 1 / 4; }
+        .strategies-title-row { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+        .strategies-title { font-size: 1.1em; font-weight: 700; letter-spacing: -0.3px; }
+        .strategies-subtitle { font-size: 0.75em; color: var(--text-muted); padding: 4px 10px; background: rgba(255,170,0,0.08); border: 1px solid rgba(255,170,0,0.15); border-radius: 6px; color: var(--yellow); font-weight: 600; letter-spacing: 0.5px; }
+        .strategies-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+        .strat-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 20px; position: relative; overflow: hidden; transition: all 0.4s ease; }
+        .strat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 16px 16px 0 0; transition: opacity 0.3s; }
+        .strat-card.risk-alto::before { background: linear-gradient(90deg, var(--red), var(--yellow)); }
+        .strat-card.risk-muito-alto::before { background: linear-gradient(90deg, #ff0044, var(--red)); }
+        .strat-card.risk-medio::before { background: linear-gradient(90deg, var(--yellow), var(--blue)); }
+        .strat-card.risk-medio-baixo::before { background: linear-gradient(90deg, var(--blue), var(--green)); }
+        .strat-card:hover { background: var(--bg-card-hover); border-color: var(--border-glow); transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
+        .strat-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+        .strat-name { font-size: 0.85em; font-weight: 700; letter-spacing: -0.2px; line-height: 1.3; max-width: 80%; }
+        .strat-help { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 0.72em; font-weight: 700; color: var(--text-muted); cursor: help; transition: all 0.3s; position: relative; flex-shrink: 0; }
+        .strat-help:hover { background: rgba(0,255,136,0.15); border-color: var(--green); color: var(--green); }
+        .strat-tooltip { display: none; position: absolute; top: 30px; right: 0; z-index: 1000; width: 280px; padding: 16px; border-radius: 12px; background: #1a1a2e; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 16px 48px rgba(0,0,0,0.6); font-weight: 400; font-size: 0.85em; line-height: 1.6; color: var(--text-secondary); }
+        .strat-help:hover .strat-tooltip { display: block; }
+        .strat-tooltip-title { font-weight: 700; color: var(--text-primary); margin-bottom: 8px; font-size: 1em; }
+        .strat-tooltip-tools { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.9em; color: var(--text-muted); }
+        .strat-tooltip-tools span { color: var(--blue); font-weight: 500; }
+        .strat-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+        .strat-badge { padding: 3px 8px; border-radius: 5px; font-size: 0.6em; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+        .strat-badge.risk-high { background: rgba(255,68,102,0.12); color: var(--red); }
+        .strat-badge.risk-vhigh { background: rgba(255,0,68,0.15); color: #ff3366; }
+        .strat-badge.risk-med { background: rgba(255,170,0,0.12); color: var(--yellow); }
+        .strat-badge.risk-low { background: rgba(0,255,136,0.12); color: var(--green); }
+        .strat-badge.return-badge { background: rgba(68,136,255,0.12); color: var(--blue); }
+        .strat-badge.time-badge { background: rgba(170,102,255,0.10); color: var(--purple); }
+        .strat-stats { display: flex; flex-direction: column; gap: 8px; }
+        .strat-stat-row { display: flex; justify-content: space-between; align-items: center; }
+        .strat-stat-label { font-size: 0.68em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .strat-stat-value { font-family: 'JetBrains Mono', monospace; font-size: 0.82em; font-weight: 600; }
+        .strat-pnl { font-size: 1.5em; font-weight: 800; font-family: 'JetBrains Mono', monospace; margin: 10px 0 6px 0; letter-spacing: -0.5px; }
+        .strat-pnl.profit { color: var(--green); text-shadow: 0 0 15px var(--green-glow); }
+        .strat-pnl.loss { color: var(--red); text-shadow: 0 0 15px var(--red-glow); }
+        .strat-pnl.neutral { color: var(--text-muted); }
+        .strat-winrate-bar { width: 100%; height: 4px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+        .strat-winrate-fill { height: 100%; border-radius: 2px; transition: width 1s ease; }
+        .strat-recent { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-color); max-height: 0; overflow: hidden; transition: max-height 0.4s ease; }
+        .strat-card:hover .strat-recent { max-height: 200px; }
+        .strat-recent-title { font-size: 0.65em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+        .strat-recent-item { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; font-size: 0.72em; font-family: 'JetBrains Mono', monospace; }
+        .strat-recent-name { color: var(--text-secondary); }
+        .strat-recent-pnl { font-weight: 600; }
 
         /* ===== RESPONSIVE ===== */
         @media (max-width: 1024px) {
@@ -548,6 +594,8 @@ DASHBOARD_HTML = r"""
             .positions-card { grid-column: 1 / 3; }
             .log-card { grid-column: 1 / 3; }
             .price-card, .pnl-card, .status-card { grid-column: auto; }
+            .strategies-section { grid-column: 1 / 3; }
+            .strategies-grid { grid-template-columns: repeat(3, 1fr); }
         }
         @media (max-width: 768px) {
             .main {
@@ -557,10 +605,15 @@ DASHBOARD_HTML = r"""
             .chart-card, .indicators-card, .signals-card,
             .positions-card, .log-card,
             .price-card, .pnl-card, .status-card { grid-column: 1 / 2; }
+            .strategies-section { grid-column: 1 / 2; }
+            .strategies-grid { grid-template-columns: 1fr 1fr; }
             .price-main { font-size: 2.2em; }
             .header { padding: 14px 16px; }
             .header-title { font-size: 1em; }
             .position-item { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 480px) {
+            .strategies-grid { grid-template-columns: 1fr; }
         }
 
         /* ===== SKELETON ===== */
@@ -756,6 +809,52 @@ DASHBOARD_HTML = r"""
             </div>
             <div id="positions-container">
                 <div class="no-positions">Nenhuma posicao aberta</div>
+            </div>
+        </div>
+
+        <!-- ===== 5 ESTRATEGIAS DE DAY TRADE ===== -->
+        <div class="strategies-section">
+            <div class="strategies-title-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--yellow)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                <span class="strategies-title">Estrategias de Day Trade</span>
+                <span class="strategies-subtitle">MODO TESTE</span>
+            </div>
+            <div class="strategies-grid">
+                <div class="strat-card risk-alto" id="strat-sniper">
+                    <div class="strat-header"><div class="strat-name">Sniping Pump.fun</div><div class="strat-help">?<div class="strat-tooltip"><div class="strat-tooltip-title">Sniping de Novos Tokens</div>Usa bots automatizados para detectar e comprar tokens no momento exato do lancamento no Pump.fun, antes que aparecam para usuarios comuns (vantagem de 0.01s vs 60s). Opera em velocidade ultra-rapida (segundos).<div class="strat-tooltip-tools">Ferramentas: <span>Solana Sniper Bot, MEV Bots</span></div></div></div></div>
+                    <div class="strat-badges"><span class="strat-badge risk-high">Risco Alto</span><span class="strat-badge return-badge">Retorno Muito Alto</span><span class="strat-badge time-badge">Segundos</span></div>
+                    <div class="strat-pnl neutral" id="strat-sniper-pnl">0.0%</div>
+                    <div class="strat-stats"><div class="strat-stat-row"><span class="strat-stat-label">Snipes</span><span class="strat-stat-value" id="strat-sniper-trades">0</span></div><div class="strat-stat-row"><span class="strat-stat-label">Win Rate</span><span class="strat-stat-value" id="strat-sniper-wr">0%</span></div><div class="strat-winrate-bar"><div class="strat-winrate-fill" id="strat-sniper-wrbar" style="width:0%;background:var(--red)"></div></div><div class="strat-stat-row"><span class="strat-stat-label">Rugged</span><span class="strat-stat-value" id="strat-sniper-rug" style="color:var(--red)">0</span></div></div>
+                    <div class="strat-recent"><div class="strat-recent-title">Ultimos Snipes</div><div id="strat-sniper-recent"></div></div>
+                </div>
+                <div class="strat-card risk-alto" id="strat-memecoin">
+                    <div class="strat-header"><div class="strat-name">Meme Coins Liquidez</div><div class="strat-help">?<div class="strat-tooltip"><div class="strat-tooltip-title">Trading de Meme Coins</div>Identifica meme coins da Solana com liquidez real, volume crescente e tempo de mercado. Foca em entradas e saidas rapidas baseadas em momentum e analise on-chain.<div class="strat-tooltip-tools">Ferramentas: <span>DexScreener, Birdeye, Jupiter</span></div></div></div></div>
+                    <div class="strat-badges"><span class="strat-badge risk-high">Risco Alto</span><span class="strat-badge return-badge">Retorno Alto</span><span class="strat-badge time-badge">Min a Horas</span></div>
+                    <div class="strat-pnl neutral" id="strat-meme-pnl">0.0%</div>
+                    <div class="strat-stats"><div class="strat-stat-row"><span class="strat-stat-label">Trades</span><span class="strat-stat-value" id="strat-meme-trades">0</span></div><div class="strat-stat-row"><span class="strat-stat-label">Win Rate</span><span class="strat-stat-value" id="strat-meme-wr">0%</span></div><div class="strat-winrate-bar"><div class="strat-winrate-fill" id="strat-meme-wrbar" style="width:0%;background:var(--red)"></div></div><div class="strat-stat-row"><span class="strat-stat-label">Momentum</span><span class="strat-stat-value" id="strat-meme-momentum" style="color:var(--blue)">0</span></div></div>
+                    <div class="strat-recent"><div class="strat-recent-title">Ultimos Sinais</div><div id="strat-meme-recent"></div></div>
+                </div>
+                <div class="strat-card risk-medio" id="strat-arbitrage">
+                    <div class="strat-header"><div class="strat-name">Arbitragem DEX</div><div class="strat-help">?<div class="strat-tooltip"><div class="strat-tooltip-title">Arbitragem entre DEXs</div>Explora diferencas de preco do mesmo token entre Raydium, Jupiter, Meteora e Orca. Executa compra/venda simultanea via bots customizados para lucro sem risco direcional.<div class="strat-tooltip-tools">Ferramentas: <span>Python/Rust Bots, APIs DEX, Jito MEV</span></div></div></div></div>
+                    <div class="strat-badges"><span class="strat-badge risk-med">Risco Medio</span><span class="strat-badge return-badge">Consistente</span><span class="strat-badge time-badge">Milissegundos</span></div>
+                    <div class="strat-pnl neutral" id="strat-arb-pnl">$0.00</div>
+                    <div class="strat-stats"><div class="strat-stat-row"><span class="strat-stat-label">Executados</span><span class="strat-stat-value" id="strat-arb-trades">0</span></div><div class="strat-stat-row"><span class="strat-stat-label">Avg Spread</span><span class="strat-stat-value" id="strat-arb-spread">0%</span></div><div class="strat-winrate-bar"><div class="strat-winrate-fill" id="strat-arb-wrbar" style="width:0%;background:var(--blue)"></div></div><div class="strat-stat-row"><span class="strat-stat-label">$/hora</span><span class="strat-stat-value" id="strat-arb-perhr" style="color:var(--green)">$0.00</span></div></div>
+                    <div class="strat-recent"><div class="strat-recent-title">Ultimas Oportunidades</div><div id="strat-arb-recent"></div></div>
+                </div>
+                <div class="strat-card risk-medio-baixo" id="strat-scalping">
+                    <div class="strat-header"><div class="strat-name">Scalping Tokens</div><div class="strat-help">?<div class="strat-tooltip"><div class="strat-tooltip-title">Scalping em Tokens Estabelecidos</div>Multiplas operacoes rapidas (1-5 min) em tokens com boa liquidez (SOL, JUP, BONK, WIF). Aproveita micro-movimentos de preco com stop-loss rigido. Foco em consistencia.<div class="strat-tooltip-tools">Ferramentas: <span>Jupiter Router, Graficos 1m/5m</span></div></div></div></div>
+                    <div class="strat-badges"><span class="strat-badge risk-low">Risco Medio-Baixo</span><span class="strat-badge return-badge">Consistente</span><span class="strat-badge time-badge">1-5 min</span></div>
+                    <div class="strat-pnl neutral" id="strat-scalp-pnl">$0.00</div>
+                    <div class="strat-stats"><div class="strat-stat-row"><span class="strat-stat-label">Trades</span><span class="strat-stat-value" id="strat-scalp-trades">0</span></div><div class="strat-stat-row"><span class="strat-stat-label">Win Rate</span><span class="strat-stat-value" id="strat-scalp-wr">0%</span></div><div class="strat-winrate-bar"><div class="strat-winrate-fill" id="strat-scalp-wrbar" style="width:0%;background:var(--green)"></div></div><div class="strat-stat-row"><span class="strat-stat-label">Sharpe</span><span class="strat-stat-value" id="strat-scalp-sharpe" style="color:var(--purple)">0.0</span></div></div>
+                    <div class="strat-recent"><div class="strat-recent-title">Ultimos Trades</div><div id="strat-scalp-recent"></div></div>
+                </div>
+                <div class="strat-card risk-muito-alto" id="strat-leverage">
+                    <div class="strat-header"><div class="strat-name">Leverage Trading</div><div class="strat-help">?<div class="strat-tooltip"><div class="strat-tooltip-title">Leverage Trading em DEX</div>Usa Jupiter Perpetuals e Drift Protocol para operar com alavancagem (2x-20x) em SOL e tokens principais. Multiplica exposicao - risco muito alto de liquidacao.<div class="strat-tooltip-tools">Ferramentas: <span>Jupiter Perps, Drift, Mango</span></div></div></div></div>
+                    <div class="strat-badges"><span class="strat-badge risk-vhigh">Risco Muito Alto</span><span class="strat-badge return-badge">Retorno Muito Alto</span><span class="strat-badge time-badge">Horas a Dias</span></div>
+                    <div class="strat-pnl neutral" id="strat-lev-pnl">$0.00</div>
+                    <div class="strat-stats"><div class="strat-stat-row"><span class="strat-stat-label">Trades</span><span class="strat-stat-value" id="strat-lev-trades">0</span></div><div class="strat-stat-row"><span class="strat-stat-label">Win Rate</span><span class="strat-stat-value" id="strat-lev-wr">0%</span></div><div class="strat-winrate-bar"><div class="strat-winrate-fill" id="strat-lev-wrbar" style="width:0%;background:var(--red)"></div></div><div class="strat-stat-row"><span class="strat-stat-label">Liquidacoes</span><span class="strat-stat-value" id="strat-lev-liq" style="color:var(--red)">0</span></div></div>
+                    <div class="strat-recent"><div class="strat-recent-title">Ultimas Posicoes</div><div id="strat-lev-recent"></div></div>
+                </div>
             </div>
         </div>
 
@@ -1006,7 +1105,25 @@ function updateDashboard(data) {
         container.innerHTML = logHtml;
         container.scrollTop = container.scrollHeight;
     }
+
+    // Strategies
+    if(data.strategies){updateStrategies(data.strategies);}
 }
+
+// ============================================================
+// STRATEGY PANELS UPDATE
+// ============================================================
+function updateStrategies(strats){
+    if(strats.sniper){const s=strats.sniper.stats||{};setPnl('strat-sniper-pnl',s.total_pnl||0,true);setText('strat-sniper-trades',s.total_snipes||0);setText('strat-sniper-wr',(s.win_rate||0).toFixed(0)+'%');setBar('strat-sniper-wrbar',s.win_rate||0);setText('strat-sniper-rug',s.rugged||0);setRecent('strat-sniper-recent',(strats.sniper.recent_targets||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.name}</span><span class="strat-recent-pnl" style="color:${t.pnl_pct>=0?'var(--green)':'var(--red)'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</span></div>`);}
+    if(strats.memecoin){const s=strats.memecoin.stats||{};setPnl('strat-meme-pnl',s.total_pnl||0,true);setText('strat-meme-trades',s.total_trades||0);setText('strat-meme-wr',(s.win_rate||0).toFixed(0)+'%');setBar('strat-meme-wrbar',s.win_rate||0);setText('strat-meme-momentum',s.high_momentum_count||0);setRecent('strat-meme-recent',(strats.memecoin.recent_signals||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.name}</span><span class="strat-recent-pnl" style="color:${t.pnl_pct>=0?'var(--green)':'var(--red)'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</span></div>`);}
+    if(strats.arbitrage){const s=strats.arbitrage.stats||{};setPnl('strat-arb-pnl',s.net_profit||0,false);setText('strat-arb-trades',s.executed||0);setText('strat-arb-spread',(s.avg_spread_pct||0).toFixed(3)+'%');setBar('strat-arb-wrbar',s.executed>0?((s.executed/(s.executed+s.failed+s.missed||1))*100):0);setText('strat-arb-perhr','$'+(s.profit_per_hour||0).toFixed(2));setRecent('strat-arb-recent',(strats.arbitrage.recent_opportunities||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.token} ${t.buy_dex}>${t.sell_dex}</span><span class="strat-recent-pnl" style="color:${t.profit>=0?'var(--green)':'var(--red)'}">$${t.profit.toFixed(3)}</span></div>`);}
+    if(strats.scalping){const s=strats.scalping.stats||{};setPnl('strat-scalp-pnl',s.total_pnl_usd||0,false);setText('strat-scalp-trades',s.total_trades||0);setText('strat-scalp-wr',(s.win_rate||0).toFixed(0)+'%');setBar('strat-scalp-wrbar',s.win_rate||0);setText('strat-scalp-sharpe',(s.sharpe_estimate||0).toFixed(1));setRecent('strat-scalp-recent',(strats.scalping.recent_trades||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.token} ${t.direction}</span><span class="strat-recent-pnl" style="color:${t.pnl_pct>=0?'var(--green)':'var(--red)'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct.toFixed(2)}%</span></div>`);}
+    if(strats.leverage){const s=strats.leverage.stats||{};setPnl('strat-lev-pnl',s.total_pnl_usd||0,false);setText('strat-lev-trades',s.total_trades||0);setText('strat-lev-wr',(s.win_rate||0).toFixed(0)+'%');setBar('strat-lev-wrbar',s.win_rate||0);setText('strat-lev-liq',s.liquidations||0);setRecent('strat-lev-recent',(strats.leverage.recent_positions||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.token} ${t.direction} ${t.leverage}</span><span class="strat-recent-pnl" style="color:${t.pnl_pct>=0?'var(--green)':'var(--red)'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</span></div>`);}
+}
+function setPnl(id,val,isPct){const el=document.getElementById(id);if(!el)return;const txt=isPct?((val>=0?'+':'')+val.toFixed(1)+'%'):((val>=0?'+$':'-$')+Math.abs(val).toFixed(2));el.textContent=txt;el.className='strat-pnl '+(val>0?'profit':val<0?'loss':'neutral');}
+function setText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
+function setBar(id,pct){const el=document.getElementById(id);if(!el)return;el.style.width=Math.min(100,Math.max(0,pct))+'%';el.style.background=pct>=60?'var(--green)':pct>=40?'var(--yellow)':'var(--red)';}
+function setRecent(id,items,renderer){const el=document.getElementById(id);if(!el||!items.length)return;el.innerHTML=items.map(renderer).join('');}
 
 // ============================================================
 // INDICATOR UPDATE
@@ -1291,6 +1408,7 @@ class DashboardServer:
             "indicators": indicators,
             "last_signal": last_signal,
             "logs": self.logs[-30:],
+            "strategies": self.bot.strategies.get_all_dashboard_data() if hasattr(self.bot, 'strategies') else {},
         }
 
     async def handle_status(self, request):
