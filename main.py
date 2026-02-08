@@ -100,6 +100,7 @@ class TelegramBot:
         self.last_indicators = {}
         self.last_hourly_price_hour = -1  # Track last hour we sent price update
         self.last_daily_review_hour = -1  # Track daily review
+        self.analysis_history = []  # Last N analyses for dashboard
 
         # Dashboard Web
         self.dashboard = DashboardServer(self)
@@ -532,6 +533,28 @@ class TelegramBot:
             f"{agreeing}/{total_ind} ind"
         )
 
+        # 5.1 Salva análise no histórico para o dashboard
+        rejection_reason_preview = getattr(self.confluence, 'last_rejection_reason', '')
+        analysis_entry = {
+            "num": self.analysis_count,
+            "time": now_br().strftime("%H:%M:%S"),
+            "price": round(current_price, 2),
+            "direction": conf["direction"],
+            "confidence": round(confidence_pct, 1),
+            "agreeing": agreeing,
+            "total": total_ind,
+            "rsi": round(rsi_val, 1),
+            "volume": round(vol_ratio, 2),
+            "scores": {k: round(v, 3) for k, v in conf["combined_scores"].items()},
+            "signal": False,  # updated below if signal generated
+            "reason": "",
+            "threshold": round(self.learning.get_effective_threshold() * 100, 1),
+            "risk_level": self.learning.state.get("current_risk_level", 1.0),
+        }
+        self.analysis_history.append(analysis_entry)
+        if len(self.analysis_history) > 50:
+            self.analysis_history = self.analysis_history[-50:]
+
         # 6. Verifica posições existentes (SL/TP)
         events = await self.executor.check_positions(current_price)
         for event in events:
@@ -560,6 +583,11 @@ class TelegramBot:
             rejection_reason=rejection_reason,
             analysis_number=self.analysis_count,
         )
+
+        # Atualiza análise no histórico com resultado do sinal
+        if self.analysis_history:
+            self.analysis_history[-1]["signal"] = signal is not None
+            self.analysis_history[-1]["reason"] = rejection_reason
 
         # 7.2 APRENDIZADO: Atualiza precos futuros de analises anteriores
         self.learning.update_future_prices(current_price)
@@ -682,6 +710,7 @@ class TelegramBot:
                     "streak": self.learning.state.get("streak", 0),
                     "total_analyses": self.learning.state.get("total_analyses", 0),
                 },
+                "analysis_history": self.analysis_history[-20:],
             }
             await push_to_cloud(cloud_data)
         except Exception as e:

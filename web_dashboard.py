@@ -34,6 +34,7 @@ BOT_DATA = {
     "indicators": {},
     "last_signal": None,
     "logs": [],
+    "analysis_history": [],
     "last_push": 0,
 }
 
@@ -242,6 +243,59 @@ def get_dashboard_html():
         .position-field-label { font-size: 0.65em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
         .position-field-value { font-family: 'JetBrains Mono', monospace; font-size: 0.9em; font-weight: 600; margin-top: 2px; }
         .no-positions { text-align: center; padding: 30px; color: var(--text-muted); font-size: 0.9em; }
+        .analysis-card { grid-column: 1 / 4; }
+        .analysis-list { display: flex; flex-direction: column; gap: 8px; max-height: 480px; overflow-y: auto; }
+        .analysis-list::-webkit-scrollbar { width: 6px; }
+        .analysis-list::-webkit-scrollbar-track { background: transparent; }
+        .analysis-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+        .analysis-entry {
+            background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);
+            border-radius: 12px; padding: 14px 16px; transition: all 0.3s ease;
+            cursor: pointer; position: relative; overflow: hidden;
+        }
+        .analysis-entry:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); }
+        .analysis-entry.signal-fired { border-left: 3px solid var(--green); }
+        .analysis-entry.signal-rejected { border-left: 3px solid var(--text-muted); }
+        .analysis-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .analysis-num { font-family: 'JetBrains Mono', monospace; font-size: 0.75em; color: var(--text-muted); font-weight: 600; }
+        .analysis-time { font-family: 'JetBrains Mono', monospace; font-size: 0.75em; color: var(--text-muted); }
+        .analysis-main { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+        .analysis-direction {
+            padding: 3px 10px; border-radius: 6px; font-size: 0.75em;
+            font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .analysis-direction.long { background: var(--green-dark); color: var(--green); }
+        .analysis-direction.short { background: var(--red-dark); color: var(--red); }
+        .analysis-price { font-family: 'JetBrains Mono', monospace; font-size: 0.95em; font-weight: 600; }
+        .analysis-conf-bar { flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; position: relative; }
+        .analysis-conf-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+        .analysis-conf-fill.high { background: linear-gradient(90deg, var(--blue), var(--green)); }
+        .analysis-conf-fill.medium { background: linear-gradient(90deg, var(--blue), var(--yellow)); }
+        .analysis-conf-fill.low { background: linear-gradient(90deg, var(--red-dim), var(--red)); }
+        .analysis-conf-text { font-family: 'JetBrains Mono', monospace; font-size: 0.8em; font-weight: 600; min-width: 38px; text-align: right; }
+        .analysis-details { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
+        .analysis-detail { font-size: 0.72em; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 4px; }
+        .analysis-detail .dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+        .analysis-detail .dot.green { background: var(--green); }
+        .analysis-detail .dot.red { background: var(--red); }
+        .analysis-detail .dot.neutral { background: var(--text-muted); }
+        .analysis-result-badge {
+            font-size: 0.65em; padding: 2px 8px; border-radius: 4px;
+            font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+        }
+        .analysis-result-badge.fired { background: rgba(0,255,136,0.15); color: var(--green); }
+        .analysis-result-badge.rejected { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+        .analysis-reason { font-size: 0.7em; color: var(--yellow); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+        .analysis-scores { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color); }
+        .analysis-entry.expanded .analysis-scores { display: block; }
+        .score-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+        .score-item { display: flex; justify-content: space-between; align-items: center; font-size: 0.72em; font-family: 'JetBrains Mono', monospace; padding: 4px 8px; background: rgba(255,255,255,0.02); border-radius: 6px; }
+        .score-name { color: var(--text-secondary); }
+        .score-val { font-weight: 600; }
+        .score-val.pos { color: var(--green); }
+        .score-val.neg { color: var(--red); }
+        .score-val.zero { color: var(--text-muted); }
+        .analysis-empty { text-align: center; padding: 40px; color: var(--text-muted); font-size: 0.9em; }
         .log-card { grid-column: 1 / 4; }
         .log-container {
             background: rgba(0,0,0,0.3); border: 1px solid var(--border-color);
@@ -262,14 +316,14 @@ def get_dashboard_html():
         .footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.75em; border-top: 1px solid var(--border-color); margin-top: 16px; }
         @media (max-width: 1024px) {
             .main { grid-template-columns: 1fr 1fr; }
-            .chart-card, .positions-card, .log-card { grid-column: 1 / 3; }
+            .chart-card, .positions-card, .log-card, .analysis-card { grid-column: 1 / 3; }
             .indicators-card { grid-column: 1 / 2; }
             .signals-card { grid-column: 2 / 3; }
             .price-card, .pnl-card, .status-card { grid-column: auto; }
         }
         @media (max-width: 768px) {
             .main { grid-template-columns: 1fr; padding: 12px; }
-            .chart-card, .indicators-card, .signals-card, .positions-card, .log-card,
+            .chart-card, .indicators-card, .signals-card, .positions-card, .log-card, .analysis-card,
             .price-card, .pnl-card, .status-card { grid-column: 1 / 2; }
             .price-main { font-size: 2.2em; }
             .header { padding: 14px 16px; }
@@ -353,6 +407,12 @@ def get_dashboard_html():
         <div class="card positions-card">
             <div class="card-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg> Posicoes Abertas</div>
             <div id="positions-container"><div class="no-positions">Nenhuma posicao aberta</div></div>
+        </div>
+        <div class="card analysis-card">
+            <div class="card-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg> Historico de Analises</div>
+            <div class="analysis-list" id="analysis-list">
+                <div class="analysis-empty">Aguardando analises do bot...</div>
+            </div>
         </div>
         <div class="card log-card">
             <div class="card-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> Terminal</div>
@@ -444,6 +504,44 @@ function updateDashboard(data) {
     if(data.logs&&data.logs.length>0){let lh='';for(const log of data.logs.slice(-30)){let cls='';if(log.includes('ERRO')||log.includes('ERROR'))cls='log-error';else if(log.includes('WARN'))cls='log-warn';else if(log.includes('Sinal')||log.includes('BUY')||log.includes('SELL'))cls='log-success';else cls='log-info';
         const parts=log.split(' ');lh+=`<div class="log-line"><span class="log-time">${parts[0]||''}</span><span class="log-msg ${cls}">${parts.slice(1).join(' ')}</span></div>`;}
         const c=document.getElementById('log-container');c.innerHTML=lh;c.scrollTop=c.scrollHeight;}
+    if(data.analysis_history&&data.analysis_history.length>0){renderAnalysisHistory(data.analysis_history);}
+}
+function renderAnalysisHistory(history){
+    const container=document.getElementById('analysis-list');
+    const reversed=history.slice().reverse();
+    let html='';
+    const reasonMap={'low_confidence':'Confianca baixa','few_indicators':'Poucos indicadores','low_rr':'R:R baixo','rsi_filter':'Filtro RSI','volume_filter':'Volume baixo','':'--'};
+    for(const a of reversed){
+        const dirCls=a.direction==='long'?'long':'short';
+        const confCls=a.confidence>=50?'high':a.confidence>=30?'medium':'low';
+        const entryCls=a.signal?'signal-fired':'signal-rejected';
+        const resultBadge=a.signal?'<span class="analysis-result-badge fired">SINAL GERADO</span>':'<span class="analysis-result-badge rejected">SEM SINAL</span>';
+        const rsiState=a.rsi<30?'green':a.rsi>70?'red':'neutral';
+        const volState=a.volume>1.5?'green':a.volume<0.5?'red':'neutral';
+        const reasonText=a.reason?reasonMap[a.reason]||a.reason:'';
+        const reasonHtml=reasonText&&!a.signal?`<div class="analysis-reason">Motivo: ${reasonText}</div>`:'';
+        let scoresHtml='';
+        if(a.scores){scoresHtml='<div class="score-grid">';for(const[k,v]of Object.entries(a.scores)){const cls=v>0.1?'pos':v<-0.1?'neg':'zero';const name=k.replace(/_/g,' ');scoresHtml+=`<div class="score-item"><span class="score-name">${name}</span><span class="score-val ${cls}">${v>0?'+':''}${v.toFixed(3)}</span></div>`;}scoresHtml+='</div>';}
+        html+=`<div class="analysis-entry ${entryCls}" onclick="this.classList.toggle('expanded')">
+            <div class="analysis-header"><span class="analysis-num">#${a.num}</span>${resultBadge}<span class="analysis-time">${a.time}</span></div>
+            <div class="analysis-main">
+                <span class="analysis-direction ${dirCls}">${a.direction==='long'?'&#9650; LONG':'&#9660; SHORT'}</span>
+                <span class="analysis-price">$${a.price.toFixed(2)}</span>
+                <div class="analysis-conf-bar"><div class="analysis-conf-fill ${confCls}" style="width:${a.confidence}%"></div></div>
+                <span class="analysis-conf-text" style="color:${confCls==='high'?'var(--green)':confCls==='medium'?'var(--yellow)':'var(--red)'}">${a.confidence.toFixed(0)}%</span>
+            </div>
+            <div class="analysis-details">
+                <span class="analysis-detail"><span class="dot ${rsiState}"></span>RSI ${a.rsi}</span>
+                <span class="analysis-detail"><span class="dot ${volState}"></span>Vol ${a.volume}x</span>
+                <span class="analysis-detail">${a.agreeing}/${a.total} ind</span>
+                <span class="analysis-detail">Thresh ${a.threshold}%</span>
+                <span class="analysis-detail">Risco ${a.risk_level}x</span>
+            </div>
+            ${reasonHtml}
+            <div class="analysis-scores">${scoresHtml}</div>
+        </div>`;
+    }
+    container.innerHTML=html;
 }
 function updateIndicator(id,name,value,min,max,getState,format){if(value===undefined||value===null)return;const row=document.getElementById('ind-'+id);if(!row)return;const state=getState(value);const pct=Math.max(0,Math.min(100,((value-min)/(max-min))*100));
     row.querySelector('.indicator-dot').className='indicator-dot '+state;const bar=row.querySelector('.indicator-bar-fill');bar.style.width=pct+'%';bar.className='indicator-bar-fill '+state;
