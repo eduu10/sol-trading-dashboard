@@ -744,46 +744,33 @@ class TelegramBot:
         except Exception as e:
             logger.debug(f"Strategies simulation error: {e}")
 
-        # Executa trades reais para estrategias com capital alocado
+        # Sincroniza MODO REAL com simulacoes (replica PNL proporcional)
         try:
-            real_trades = self.strategies.get_pending_real_trades()
-            for trade in real_trades:
+            replicated = self.strategies.sync_real_from_simulations()
+            for trade in replicated:
                 strat_key = trade["strategy"]
-                direction = trade["direction"]
-                amount_usd = trade["amount_usd"]
-                trade_id = trade["trade_id"]
+                coin = trade["coin"]
+                amount = trade["amount"]
+                real_pnl = trade["real_pnl"]
+                sim_pnl_pct = trade["sim_pnl_pct"]
+                info = trade.get("last_info", {})
+                info_str = ""
+                if info:
+                    info_str = f"\nUltimo: {info.get('status', '?')} | PNL sim: {info.get('pnl_pct', 0):+.1f}%"
 
-                if direction != "long":
-                    logger.info(f"[REAL] Skip short trade for {strat_key} (DEX spot only)")
-                    continue
-
-                logger.info(f"[REAL TRADE] {strat_key}: {direction} ${amount_usd:.2f}")
-
-                # USDC -> SOL swap via Jupiter
-                input_mint = config.TOKENS["USDC"]
-                output_mint = config.TOKENS["SOL"]
-                amount_lamports = int(amount_usd * 1_000_000)  # USDC has 6 decimals
-
-                quote = await self.executor.get_quote(input_mint, output_mint, amount_lamports)
-                if not quote:
-                    logger.warning(f"[REAL] No quote for {strat_key}")
-                    continue
-
-                tx_hash = await self.executor.execute_swap(quote)
-                if tx_hash and not tx_hash.startswith("ERROR"):
-                    self.strategies.mark_trade_executed(strat_key, trade_id, tx_hash)
-                    logger.info(f"[REAL] Trade executed: {strat_key} TX={tx_hash}")
-                    await self.send_message(
-                        f"💰 TRADE REAL executado!\n"
-                        f"Estrategia: {strat_key}\n"
-                        f"Direcao: {direction.upper()}\n"
-                        f"Valor: ${amount_usd:.2f}\n"
-                        f"TX: `{tx_hash}`"
-                    )
-                else:
-                    logger.warning(f"[REAL] Swap failed for {strat_key}: {tx_hash}")
+                logger.info(
+                    f"[MODO REAL] {strat_key}: trade #{trade['trades']} | "
+                    f"${amount:.2f} {coin} | PNL: ${real_pnl:+.2f} ({sim_pnl_pct:+.1f}%)"
+                )
+                await self.send_message(
+                    f"📊 *MODO REAL* - {strat_key}\n"
+                    f"Trade #{trade['trades']} replicado\n"
+                    f"Capital: ${amount:.2f} {coin}\n"
+                    f"PNL Real: ${real_pnl:+.2f} ({sim_pnl_pct:+.1f}%)"
+                    f"{info_str}"
+                )
         except Exception as e:
-            logger.debug(f"Real trades execution error: {e}")
+            logger.debug(f"Real sync error: {e}")
 
         # Atualiza saldo da carteira Phantom (read-only)
         wallet_data = {}

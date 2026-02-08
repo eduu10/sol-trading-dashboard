@@ -1360,7 +1360,7 @@ function updateAllocationsFromData(allocData){
     if(!allocData)return;
     activeAllocations={};
     for(const[k,v]of Object.entries(allocData)){
-        if(v.active)activeAllocations[k]={amount:v.amount,coin:v.coin||'SOL',status:'active',pnl:v.pnl||0,trades:v.trades||0,last_tx:v.last_tx||''};
+        if(v.active)activeAllocations[k]={amount:v.amount,coin:v.coin||'SOL',status:'active',pnl:v.pnl||0,trades:v.trades||0,last_tx:v.last_tx||'',sim_pnl_pct:v.sim_pnl_pct||0,last_trade_info:v.last_trade_info||null};
     }
     renderAllocations();
     renderRealModeSection();
@@ -1378,8 +1378,13 @@ function renderRealModeSection(){
     for(const k of keys){
         const a=activeAllocations[k];
         const pnl=a.pnl||0;
+        const simPct=a.sim_pnl_pct||0;
         const pnlCls=pnl>0?'profit':pnl<0?'loss':'neutral';
         const pnlColor=pnl>0?'var(--green)':pnl<0?'var(--red)':'var(--text-muted)';
+        const pctColor=simPct>0?'var(--green)':simPct<0?'var(--red)':'var(--text-muted)';
+        const info=a.last_trade_info;
+        let infoHtml='';
+        if(info){const ip=info.pnl_pct||0;infoHtml=`<div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Ultimo Trade</span><span class="strat-cap-value" style="color:${ip>=0?'var(--green)':'var(--red)'}">${info.name||info.token||'?'} ${info.status||'?'} ${ip>=0?'+':''}${ip.toFixed(1)}%</span></div>`;}
         html+=`<div class="strat-card real-mode ${riskMap[k]||''}" id="real-${k}">
             <div class="strat-header">
                 <div class="strat-name">${nameMap[k]||k}</div>
@@ -1388,18 +1393,19 @@ function renderRealModeSection(){
             <div class="strat-badges">
                 <span class="real-coin-badge">${a.coin||'SOL'}</span>
                 <span class="strat-badge return-badge">$${a.amount.toFixed(2)}</span>
+                <span class="strat-badge time-badge">${a.trades||0} trades</span>
             </div>
             <div class="strat-pnl ${pnlCls}" id="real-${k}-pnl">${pnl>=0?'+$':'-$'}${Math.abs(pnl).toFixed(2)}</div>
             <div class="strat-capital">
                 <div class="strat-cap-item"><span class="strat-cap-label">Alocado</span><span class="strat-cap-value" style="color:var(--yellow)">$${a.amount.toFixed(2)}</span></div>
                 <div class="strat-cap-item"><span class="strat-cap-label">Moeda</span><span class="strat-cap-value" style="color:var(--purple)">${a.coin||'SOL'}</span></div>
-                <div class="strat-cap-item"><span class="strat-cap-label">Trades</span><span class="strat-cap-value">${a.trades||0}</span></div>
-                <div class="strat-cap-item"><span class="strat-cap-label">P&L</span><span class="strat-cap-value" style="color:${pnlColor}">${pnl>=0?'+$':'-$'}${Math.abs(pnl).toFixed(2)}</span></div>
-                ${a.last_tx?`<div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Ultima TX</span><span class="strat-cap-value" style="color:var(--blue)">${a.last_tx.substring(0,16)}...</span></div>`:''}
+                <div class="strat-cap-item"><span class="strat-cap-label">Sim %</span><span class="strat-cap-value" style="color:${pctColor}">${simPct>=0?'+':''}${simPct.toFixed(1)}%</span></div>
+                <div class="strat-cap-item"><span class="strat-cap-label">P&L Real</span><span class="strat-cap-value" style="color:${pnlColor}">${pnl>=0?'+$':'-$'}${Math.abs(pnl).toFixed(2)}</span></div>
+                ${infoHtml}
             </div>
             <div class="strat-stats">
                 <div class="strat-stat-row"><span class="strat-stat-label">Status</span><span class="strat-stat-value" style="color:var(--green)">ATIVO</span></div>
-                <div class="strat-stat-row"><span class="strat-stat-label">Trades Reais</span><span class="strat-stat-value" id="real-${k}-trades">${a.trades||0}</span></div>
+                <div class="strat-stat-row"><span class="strat-stat-label">Trades Replicados</span><span class="strat-stat-value">${a.trades||0}</span></div>
             </div>
             <button class="alloc-stop-btn" style="width:100%;margin-top:12px;justify-content:center;" onclick="deallocateStrategy('${k}')">
                 <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> Parar Modo Real

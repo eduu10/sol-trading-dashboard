@@ -151,12 +151,14 @@ class StrategiesManager:
         """Retorna todas as alocacoes para o dashboard."""
         return dict(self.allocations)
 
-    def get_pending_real_trades(self) -> List[Dict]:
+    def sync_real_from_simulations(self) -> List[Dict]:
         """
-        Verifica se alguma estrategia com capital real alocado gerou um sinal novo.
-        Retorna lista de trades para executar via Jupiter.
+        Sincroniza o MODO REAL com as simulacoes.
+        Detecta novos trades completados nas simulacoes e replica o PNL
+        proporcionalmente no capital alocado.
+        Retorna lista de trades replicados (para log/notificacao).
         """
-        trades = []
+        replicated = []
         for key in self.STRATEGY_KEYS:
             alloc = self.get_allocation(key)
             if not alloc:
@@ -169,84 +171,107 @@ class StrategiesManager:
                 continue
 
             data = strat.get_dashboard_data()
+            capital = data.get("capital", {})
 
-            # Cada estrategia tem estruturas diferentes
+            # Conta total de trades da simulacao
+            stats = data.get("stats", {})
+            sim_trades = 0
+            if key == "sniper":
+                sim_trades = stats.get("total_snipes", 0)
+            elif key == "arbitrage":
+                sim_trades = stats.get("executed", 0)
+            else:
+                sim_trades = stats.get("total_trades", 0)
+
+            # Quantos trades ja replicamos?
+            last_synced = alloc.get("last_synced_trades", 0)
+            new_trades = sim_trades - last_synced
+
+            if new_trades <= 0:
+                continue
+
+            # Pega o PNL da simulacao (% sobre capital teste $100)
+            sim_pnl_usd = capital.get("pnl_usd", 0)
+            sim_capital = capital.get("initial", 100.0)
+            if sim_capital <= 0:
+                sim_capital = 100.0
+            sim_pnl_pct = (sim_pnl_usd / sim_capital) * 100 if sim_capital else 0
+
+            # Calcula PNL real proporcional ao capital alocado
+            real_amount = alloc["amount"]
+            real_pnl = real_amount * (sim_pnl_pct / 100)
+
+            # Pega ultimo trade recente para detalhes
+            last_trade_info = self._get_last_trade_info(key, data)
+
+            # Atualiza alocacao
+            alloc["pnl"] = round(real_pnl, 4)
+            alloc["trades"] = sim_trades
+            alloc["last_synced_trades"] = sim_trades
+            alloc["sim_pnl_pct"] = round(sim_pnl_pct, 2)
+            alloc["last_sync"] = time.time()
+            if last_trade_info:
+                alloc["last_trade_info"] = last_trade_info
+
+            self._save_allocations()
+
+            for _ in range(new_trades):
+                replicated.append({
+                    "strategy": key,
+                    "coin": alloc.get("coin", "SOL"),
+                    "amount": real_amount,
+                    "sim_pnl_pct": sim_pnl_pct,
+                    "real_pnl": real_pnl,
+                    "trades": sim_trades,
+                    "last_info": last_trade_info,
+                })
+
+            if new_trades > 0:
+                logger.info(
+                    f"[MODO REAL] {key}: {new_trades} novos trades | "
+                    f"Sim PNL: {sim_pnl_pct:+.2f}% | "
+                    f"Real PNL: ${real_pnl:+.2f} (de ${real_amount:.2f})"
+                )
+
+        return replicated
+
+    def _get_last_trade_info(self, key: str, data: Dict) -> Optional[Dict]:
+        """Extrai info do ultimo trade da simulacao para mostrar no dashboard."""
+        try:
             if key == "scalping":
                 recent = data.get("recent_trades", [])
                 if recent:
-                    last = recent[-1]
-                    if last.get("status") == "open" and last.get("direction"):
-                        trade_id = f"{key}_{last.get('token', 'SOL')}_{int(time.time())}"
-                        if trade_id != alloc.get("last_trade_id"):
-                            trades.append({
-                                "strategy": key,
-                                "direction": last["direction"],
-                                "amount_usd": alloc["amount"],
-                                "token": last.get("token", "SOL"),
-                                "trade_id": trade_id,
-                            })
-
+                    t = recent[-1]
+                    return {"token": t.get("token", "?"), "direction": t.get("direction", "?"),
+                            "pnl_pct": t.get("pnl_pct", 0), "status": t.get("status", "?")}
             elif key == "memecoin":
                 recent = data.get("recent_signals", [])
                 if recent:
-                    last = recent[-1]
-                    if last.get("status") == "entered":
-                        trade_id = f"{key}_{last.get('name', 'MEME')}_{int(time.time())}"
-                        if trade_id != alloc.get("last_trade_id"):
-                            trades.append({
-                                "strategy": key,
-                                "direction": "long",
-                                "amount_usd": alloc["amount"],
-                                "token": last.get("token", "SOL"),
-                                "trade_id": trade_id,
-                            })
-
+                    t = recent[-1]
+                    return {"name": t.get("name", "?"), "pnl_pct": t.get("pnl_pct", 0),
+                            "status": t.get("status", "?")}
             elif key == "arbitrage":
                 recent = data.get("recent_opportunities", [])
                 if recent:
-                    last = recent[-1]
-                    if last.get("status") == "executed":
-                        trade_id = f"{key}_{last.get('token', 'SOL')}_{int(time.time())}"
-                        if trade_id != alloc.get("last_trade_id"):
-                            trades.append({
-                                "strategy": key,
-                                "direction": "long",
-                                "amount_usd": alloc["amount"],
-                                "token": last.get("token", "SOL"),
-                                "trade_id": trade_id,
-                            })
-
+                    t = recent[-1]
+                    return {"token": t.get("token", "?"), "profit": t.get("profit", 0),
+                            "status": t.get("status", "?")}
             elif key == "sniper":
                 recent = data.get("recent_targets", [])
                 if recent:
-                    last = recent[-1]
-                    if last.get("status") == "bought":
-                        trade_id = f"{key}_{last.get('name', 'NEW')}_{int(time.time())}"
-                        if trade_id != alloc.get("last_trade_id"):
-                            trades.append({
-                                "strategy": key,
-                                "direction": "long",
-                                "amount_usd": alloc["amount"],
-                                "token": "SOL",
-                                "trade_id": trade_id,
-                            })
-
+                    t = recent[-1]
+                    return {"name": t.get("name", "?"), "pnl_pct": t.get("pnl_pct", 0),
+                            "status": t.get("status", "?")}
             elif key == "leverage":
                 recent = data.get("recent_positions", [])
                 if recent:
-                    last = recent[-1]
-                    if last.get("status") == "open" and last.get("direction"):
-                        trade_id = f"{key}_{last.get('direction', 'long')}_{int(time.time())}"
-                        if trade_id != alloc.get("last_trade_id"):
-                            trades.append({
-                                "strategy": key,
-                                "direction": last["direction"],
-                                "amount_usd": alloc["amount"],
-                                "token": "SOL",
-                                "trade_id": trade_id,
-                            })
-
-        return trades
+                    t = recent[-1]
+                    return {"token": t.get("token", "?"), "direction": t.get("direction", "?"),
+                            "pnl_pct": t.get("pnl_pct", 0), "leverage": t.get("leverage", "?"),
+                            "status": t.get("status", "?")}
+        except Exception:
+            pass
+        return None
 
     def mark_trade_executed(self, key: str, trade_id: str, tx_hash: str):
         """Marca que um trade real foi executado para evitar duplicata."""
