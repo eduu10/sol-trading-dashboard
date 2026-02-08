@@ -743,6 +743,47 @@ class TelegramBot:
         except Exception as e:
             logger.debug(f"Strategies simulation error: {e}")
 
+        # Executa trades reais para estrategias com capital alocado
+        try:
+            real_trades = self.strategies.get_pending_real_trades()
+            for trade in real_trades:
+                strat_key = trade["strategy"]
+                direction = trade["direction"]
+                amount_usd = trade["amount_usd"]
+                trade_id = trade["trade_id"]
+
+                if direction != "long":
+                    logger.info(f"[REAL] Skip short trade for {strat_key} (DEX spot only)")
+                    continue
+
+                logger.info(f"[REAL TRADE] {strat_key}: {direction} ${amount_usd:.2f}")
+
+                # USDC -> SOL swap via Jupiter
+                input_mint = config.TOKENS["USDC"]
+                output_mint = config.TOKENS["SOL"]
+                amount_lamports = int(amount_usd * 1_000_000)  # USDC has 6 decimals
+
+                quote = await self.executor.get_quote(input_mint, output_mint, amount_lamports)
+                if not quote:
+                    logger.warning(f"[REAL] No quote for {strat_key}")
+                    continue
+
+                tx_hash = await self.executor.execute_swap(quote)
+                if tx_hash and not tx_hash.startswith("ERROR"):
+                    self.strategies.mark_trade_executed(strat_key, trade_id, tx_hash)
+                    logger.info(f"[REAL] Trade executed: {strat_key} TX={tx_hash}")
+                    await self.send_message(
+                        f"💰 TRADE REAL executado!\n"
+                        f"Estrategia: {strat_key}\n"
+                        f"Direcao: {direction.upper()}\n"
+                        f"Valor: ${amount_usd:.2f}\n"
+                        f"TX: `{tx_hash}`"
+                    )
+                else:
+                    logger.warning(f"[REAL] Swap failed for {strat_key}: {tx_hash}")
+        except Exception as e:
+            logger.debug(f"Real trades execution error: {e}")
+
         # Atualiza saldo da carteira Phantom (read-only)
         wallet_data = {}
         if self.wallet:
@@ -797,13 +838,24 @@ class TelegramBot:
                 "analysis_history": self.analysis_history[-20:],
                 "strategies": self.strategies.get_all_dashboard_data(),
                 "wallet": wallet_data,
+                "allocations": self.strategies.get_all_allocations(),
             }
             commands = await push_to_cloud(cloud_data)
             # Processa comandos do dashboard na nuvem
             for cmd in commands:
-                if cmd.get("action") == "toggle_strategy":
+                action = cmd.get("action", "")
+                if action == "toggle_strategy":
                     key = cmd.get("strategy", "")
                     self.strategies.toggle_strategy(key)
+                elif action == "allocate_strategy":
+                    key = cmd.get("strategy", "")
+                    amount = float(cmd.get("amount", 0))
+                    if self.strategies.allocate_strategy(key, amount):
+                        logger.info(f"Alocacao real: ${amount:.2f} -> {key}")
+                elif action == "deallocate_strategy":
+                    key = cmd.get("strategy", "")
+                    if self.strategies.deallocate_strategy(key):
+                        logger.info(f"Desalocacao: {key}")
         except Exception as e:
             logger.debug(f"Cloud push prep error: {e}")
 

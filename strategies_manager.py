@@ -6,8 +6,10 @@ e fornece dados consolidados para o dashboard.
 """
 
 import asyncio
+import json
 import logging
-from typing import Dict, List
+import time
+from typing import Dict, List, Optional
 
 from strategy_sniper import SnipingStrategy
 from strategy_memecoin import MemeCoinStrategy
@@ -40,6 +42,11 @@ class StrategiesManager:
 
         # Estado pausado por estrategia
         self.paused = {k: False for k in self.STRATEGY_KEYS}
+
+        # Alocacoes de capital real por estrategia
+        # {key: {"amount": float, "active": bool, "allocated_at": float}}
+        self.allocations: Dict[str, Dict] = {}
+        self._load_allocations()
 
     def toggle_strategy(self, key: str) -> bool:
         """Alterna pausa de uma estrategia. Retorna novo estado (True=pausado)."""
@@ -89,6 +96,164 @@ class StrategiesManager:
                 logger.debug(f"Leverage sim error: {e}")
 
         return results
+
+    # ---- Alocacao de capital real ----
+
+    def _load_allocations(self):
+        """Carrega alocacoes salvas em disco."""
+        try:
+            with open("allocations.json") as f:
+                self.allocations = json.load(f)
+                logger.info(f"Loaded {len(self.allocations)} allocations")
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.allocations = {}
+
+    def _save_allocations(self):
+        """Persiste alocacoes em disco."""
+        with open("allocations.json", "w") as f:
+            json.dump(self.allocations, f, indent=2)
+
+    def allocate_strategy(self, key: str, amount: float) -> bool:
+        """Aloca capital real para uma estrategia."""
+        if key not in self.STRATEGY_KEYS:
+            return False
+        if amount <= 0:
+            return False
+        self.allocations[key] = {
+            "amount": amount,
+            "active": True,
+            "allocated_at": time.time(),
+            "pnl": 0.0,
+            "trades": 0,
+        }
+        self._save_allocations()
+        logger.info(f"ALOCACAO REAL: ${amount:.2f} -> estrategia '{key}'")
+        return True
+
+    def deallocate_strategy(self, key: str) -> bool:
+        """Remove alocacao de capital real."""
+        if key in self.allocations:
+            old = self.allocations.pop(key)
+            self._save_allocations()
+            logger.info(f"DESALOCACAO: estrategia '{key}' (era ${old.get('amount', 0):.2f})")
+            return True
+        return False
+
+    def get_allocation(self, key: str) -> Optional[Dict]:
+        """Retorna alocacao de uma estrategia ou None."""
+        alloc = self.allocations.get(key)
+        if alloc and alloc.get("active"):
+            return alloc
+        return None
+
+    def get_all_allocations(self) -> Dict:
+        """Retorna todas as alocacoes para o dashboard."""
+        return dict(self.allocations)
+
+    def get_pending_real_trades(self) -> List[Dict]:
+        """
+        Verifica se alguma estrategia com capital real alocado gerou um sinal novo.
+        Retorna lista de trades para executar via Jupiter.
+        """
+        trades = []
+        for key in self.STRATEGY_KEYS:
+            alloc = self.get_allocation(key)
+            if not alloc:
+                continue
+            if self.paused.get(key):
+                continue
+
+            strat = getattr(self, key, None)
+            if not strat:
+                continue
+
+            data = strat.get_dashboard_data()
+
+            # Cada estrategia tem estruturas diferentes
+            if key == "scalping":
+                recent = data.get("recent_trades", [])
+                if recent:
+                    last = recent[-1]
+                    if last.get("status") == "open" and last.get("direction"):
+                        trade_id = f"{key}_{last.get('token', 'SOL')}_{int(time.time())}"
+                        if trade_id != alloc.get("last_trade_id"):
+                            trades.append({
+                                "strategy": key,
+                                "direction": last["direction"],
+                                "amount_usd": alloc["amount"],
+                                "token": last.get("token", "SOL"),
+                                "trade_id": trade_id,
+                            })
+
+            elif key == "memecoin":
+                recent = data.get("recent_signals", [])
+                if recent:
+                    last = recent[-1]
+                    if last.get("status") == "entered":
+                        trade_id = f"{key}_{last.get('name', 'MEME')}_{int(time.time())}"
+                        if trade_id != alloc.get("last_trade_id"):
+                            trades.append({
+                                "strategy": key,
+                                "direction": "long",
+                                "amount_usd": alloc["amount"],
+                                "token": last.get("token", "SOL"),
+                                "trade_id": trade_id,
+                            })
+
+            elif key == "arbitrage":
+                recent = data.get("recent_opportunities", [])
+                if recent:
+                    last = recent[-1]
+                    if last.get("status") == "executed":
+                        trade_id = f"{key}_{last.get('token', 'SOL')}_{int(time.time())}"
+                        if trade_id != alloc.get("last_trade_id"):
+                            trades.append({
+                                "strategy": key,
+                                "direction": "long",
+                                "amount_usd": alloc["amount"],
+                                "token": last.get("token", "SOL"),
+                                "trade_id": trade_id,
+                            })
+
+            elif key == "sniper":
+                recent = data.get("recent_targets", [])
+                if recent:
+                    last = recent[-1]
+                    if last.get("status") == "bought":
+                        trade_id = f"{key}_{last.get('name', 'NEW')}_{int(time.time())}"
+                        if trade_id != alloc.get("last_trade_id"):
+                            trades.append({
+                                "strategy": key,
+                                "direction": "long",
+                                "amount_usd": alloc["amount"],
+                                "token": "SOL",
+                                "trade_id": trade_id,
+                            })
+
+            elif key == "leverage":
+                recent = data.get("recent_positions", [])
+                if recent:
+                    last = recent[-1]
+                    if last.get("status") == "open" and last.get("direction"):
+                        trade_id = f"{key}_{last.get('direction', 'long')}_{int(time.time())}"
+                        if trade_id != alloc.get("last_trade_id"):
+                            trades.append({
+                                "strategy": key,
+                                "direction": last["direction"],
+                                "amount_usd": alloc["amount"],
+                                "token": "SOL",
+                                "trade_id": trade_id,
+                            })
+
+        return trades
+
+    def mark_trade_executed(self, key: str, trade_id: str, tx_hash: str):
+        """Marca que um trade real foi executado para evitar duplicata."""
+        if key in self.allocations:
+            self.allocations[key]["last_trade_id"] = trade_id
+            self.allocations[key]["last_tx"] = tx_hash
+            self.allocations[key]["trades"] = self.allocations[key].get("trades", 0) + 1
+            self._save_allocations()
 
     def get_all_dashboard_data(self) -> Dict:
         """Retorna dados de todas as estrategias para o dashboard."""

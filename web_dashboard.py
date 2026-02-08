@@ -330,6 +330,54 @@ def get_dashboard_html():
         .wallet-bal-value { font-family: 'JetBrains Mono', monospace; font-size: 1.1em; font-weight: 700; }
         .wallet-bal-sub { font-size: 0.65em; color: var(--text-muted); margin-top: 2px; }
         .wallet-readonly { font-size: 0.65em; color: var(--text-muted); background: rgba(255,255,255,0.04); padding: 3px 8px; border-radius: 4px; margin-left: auto; }
+        .wallet-allocate { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color); }
+        .wallet-alloc-title { font-size: 0.8em; font-weight: 700; color: var(--yellow); margin-bottom: 10px; letter-spacing: 0.5px; }
+        .wallet-alloc-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .alloc-select {
+            background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color);
+            padding: 8px 12px; border-radius: 8px; font-size: 0.8em; font-family: 'Inter', sans-serif;
+            cursor: pointer; min-width: 180px; outline: none; transition: border-color 0.3s;
+        }
+        .alloc-select:focus { border-color: var(--green); }
+        .alloc-select option { background: var(--bg-secondary); color: var(--text-primary); }
+        .alloc-amount-wrap {
+            display: flex; align-items: center; background: var(--bg-secondary);
+            border: 1px solid var(--border-color); border-radius: 8px; padding: 0 10px; transition: border-color 0.3s;
+        }
+        .alloc-amount-wrap:focus-within { border-color: var(--green); }
+        .alloc-currency { color: var(--text-muted); font-size: 0.85em; font-weight: 600; }
+        .alloc-input {
+            background: transparent; border: none; color: var(--text-primary);
+            padding: 8px 6px; font-size: 0.85em; font-family: 'JetBrains Mono', monospace;
+            width: 90px; outline: none;
+        }
+        .alloc-input::placeholder { color: var(--text-muted); }
+        .alloc-play-btn {
+            display: flex; align-items: center; gap: 6px; padding: 8px 18px;
+            background: linear-gradient(135deg, var(--green-dim), var(--green));
+            color: #000; border: none; border-radius: 8px; font-size: 0.8em;
+            font-weight: 700; cursor: pointer; transition: all 0.3s; font-family: 'Inter', sans-serif;
+        }
+        .alloc-play-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px var(--green-glow); }
+        .alloc-play-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+        .alloc-play-btn svg { width: 14px; height: 14px; }
+        .alloc-stop-btn {
+            display: flex; align-items: center; gap: 6px; padding: 8px 18px;
+            background: linear-gradient(135deg, var(--red-dim), var(--red));
+            color: #fff; border: none; border-radius: 8px; font-size: 0.8em;
+            font-weight: 700; cursor: pointer; transition: all 0.3s; font-family: 'Inter', sans-serif;
+        }
+        .alloc-stop-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px var(--red-glow); }
+        .wallet-alloc-active { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+        .alloc-active-item {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            background: rgba(0,255,136,0.05); border: 1px solid rgba(0,255,136,0.12);
+            border-radius: 8px; padding: 8px 12px; font-size: 0.78em;
+        }
+        .alloc-active-item .alloc-strat-name { font-weight: 600; color: var(--green); }
+        .alloc-active-item .alloc-strat-amount { font-family: 'JetBrains Mono', monospace; color: var(--yellow); }
+        .alloc-active-item .alloc-strat-status { font-size: 0.85em; color: var(--text-muted); }
+        .wallet-alloc-warning { margin-top: 8px; font-size: 0.65em; color: var(--red-dim); opacity: 0.7; }
         .strategies-section { grid-column: 1 / 4; }
         .strategies-title-row { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
         .strategies-title { font-size: 1.1em; font-weight: 700; letter-spacing: -0.3px; }
@@ -537,7 +585,29 @@ def get_dashboard_html():
                     <div class="wallet-bal"><div class="wallet-bal-label">USDC</div><div class="wallet-bal-value" id="wallet-usdc" style="color:var(--green)">$0.00</div></div>
                     <div class="wallet-bal"><div class="wallet-bal-label">Total</div><div class="wallet-bal-value" id="wallet-total" style="color:var(--yellow)">$0.00</div></div>
                 </div>
-                <div class="wallet-readonly">Somente leitura</div>
+            </div>
+            <div class="wallet-allocate" id="wallet-allocate">
+                <div class="wallet-alloc-title">Alocar Capital Real</div>
+                <div class="wallet-alloc-form">
+                    <select id="alloc-strategy" class="alloc-select">
+                        <option value="">Escolha a estrategia...</option>
+                        <option value="sniper">Sniping Pump.fun</option>
+                        <option value="memecoin">Meme Coins</option>
+                        <option value="arbitrage">Arbitragem DEX</option>
+                        <option value="scalping">Scalping Tokens</option>
+                        <option value="leverage">Leverage Trading</option>
+                    </select>
+                    <div class="alloc-amount-wrap">
+                        <span class="alloc-currency">$</span>
+                        <input type="number" id="alloc-amount" class="alloc-input" placeholder="0.00" min="0.01" step="0.01"/>
+                    </div>
+                    <button class="alloc-play-btn" id="alloc-play-btn" onclick="allocateStrategy()">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><polygon points="5,3 19,12 5,21"/></svg>
+                        Play
+                    </button>
+                </div>
+                <div class="wallet-alloc-active" id="alloc-active-list"></div>
+                <div class="wallet-alloc-warning">Trades reais via Jupiter DEX. Risco de perda.</div>
             </div>
         </div>
         <!-- ===== 5 ESTRATEGIAS DE DAY TRADE ===== -->
@@ -844,6 +914,7 @@ function updateDashboard(data) {
         document.getElementById('wallet-usdc').textContent='$'+usdc.toFixed(2);
         document.getElementById('wallet-total').textContent='$'+(solUsd+usdc).toFixed(2);
     }
+    if(data.allocations){updateAllocationsFromData(data.allocations);}
 }
 function updateStrategies(strats){
     function setCap(prefix,cap){
@@ -934,6 +1005,64 @@ async function toggleStrategy(key){
             const btn=document.getElementById(ids[1]);if(btn){btn.textContent=isPaused?'Parar':'Continuar';btn.className='strat-toggle-btn '+(isPaused?'running':'paused');}}
         }
     }catch(e){console.error('Toggle error:',e);}
+}
+// === Allocation system ===
+let activeAllocations={};
+async function allocateStrategy(){
+    const sel=document.getElementById('alloc-strategy');
+    const inp=document.getElementById('alloc-amount');
+    const strategy=sel.value;
+    const amount=parseFloat(inp.value);
+    if(!strategy){alert('Escolha uma estrategia!');return;}
+    if(!amount||amount<=0){alert('Informe um valor valido!');return;}
+    const btn=document.getElementById('alloc-play-btn');
+    btn.disabled=true;btn.textContent='Enviando...';
+    try{
+        const resp=await fetch('/api/allocate-strategy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:strategy,amount:amount})});
+        const data=await resp.json();
+        if(data.ok){
+            activeAllocations[strategy]={amount:amount,status:'active'};
+            renderAllocations();
+            sel.value='';inp.value='';
+        }else{alert('Erro: '+(data.error||'desconhecido'));}
+    }catch(e){alert('Erro de conexao: '+e);}
+    btn.disabled=false;btn.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><polygon points="5,3 19,12 5,21"/></svg> Play';
+}
+async function deallocateStrategy(key){
+    if(!confirm('Parar trades reais para '+key+'? Posicoes abertas serao fechadas.'))return;
+    try{
+        const resp=await fetch('/api/deallocate-strategy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:key})});
+        const data=await resp.json();
+        if(data.ok){delete activeAllocations[key];renderAllocations();}
+    }catch(e){alert('Erro: '+e);}
+}
+function renderAllocations(){
+    const container=document.getElementById('alloc-active-list');
+    if(!container)return;
+    const keys=Object.keys(activeAllocations);
+    if(keys.length===0){container.innerHTML='';return;}
+    const nameMap={sniper:'Sniping Pump.fun',memecoin:'Meme Coins',arbitrage:'Arbitragem DEX',scalping:'Scalping Tokens',leverage:'Leverage Trading'};
+    let html='';
+    for(const k of keys){
+        const a=activeAllocations[k];
+        html+=`<div class="alloc-active-item">
+            <span class="alloc-strat-name">${nameMap[k]||k}</span>
+            <span class="alloc-strat-amount">$${a.amount.toFixed(2)}</span>
+            <span class="alloc-strat-status">ATIVO</span>
+            <button class="alloc-stop-btn" onclick="deallocateStrategy('${k}')">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> Stop
+            </button>
+        </div>`;
+    }
+    container.innerHTML=html;
+}
+function updateAllocationsFromData(allocData){
+    if(!allocData)return;
+    activeAllocations={};
+    for(const[k,v]of Object.entries(allocData)){
+        if(v.active)activeAllocations[k]={amount:v.amount,status:'active'};
+    }
+    renderAllocations();
 }
 // Tooltip system: move all tooltips to body so overflow:hidden on cards won't clip
 (function(){
@@ -1083,6 +1212,44 @@ async def handle_toggle_strategy(request):
         return web.json_response({"error": str(e)}, status=400)
 
 
+async def handle_allocate_strategy(request):
+    """Aloca capital real para uma estrategia."""
+    try:
+        data = await request.json()
+        key = data.get("strategy", "")
+        amount = float(data.get("amount", 0))
+        valid_keys = ["sniper", "memecoin", "arbitrage", "scalping", "leverage"]
+        if key not in valid_keys:
+            return web.json_response({"error": "invalid strategy"}, status=400)
+        if amount <= 0:
+            return web.json_response({"error": "invalid amount"}, status=400)
+        PENDING_COMMANDS.append({
+            "action": "allocate_strategy",
+            "strategy": key,
+            "amount": amount,
+        })
+        return web.json_response({"ok": True, "strategy": key, "amount": amount, "queued": True})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=400)
+
+
+async def handle_deallocate_strategy(request):
+    """Remove alocacao de capital real de uma estrategia."""
+    try:
+        data = await request.json()
+        key = data.get("strategy", "")
+        valid_keys = ["sniper", "memecoin", "arbitrage", "scalping", "leverage"]
+        if key not in valid_keys:
+            return web.json_response({"error": "invalid strategy"}, status=400)
+        PENDING_COMMANDS.append({
+            "action": "deallocate_strategy",
+            "strategy": key,
+        })
+        return web.json_response({"ok": True, "strategy": key, "queued": True})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=400)
+
+
 async def handle_health(request):
     return web.json_response({"status": "ok", "last_push": BOT_DATA.get("last_push", 0)})
 
@@ -1096,6 +1263,8 @@ def create_app():
     app.router.add_get('/api/data', handle_get_data)
     app.router.add_post('/api/push', handle_push_data)
     app.router.add_post('/api/toggle-strategy', handle_toggle_strategy)
+    app.router.add_post('/api/allocate-strategy', handle_allocate_strategy)
+    app.router.add_post('/api/deallocate-strategy', handle_deallocate_strategy)
     app.router.add_get('/health', handle_health)
     return app
 
