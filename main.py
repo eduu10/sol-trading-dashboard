@@ -750,6 +750,45 @@ class TelegramBot:
         # MODO REAL: detecta novos trades e executa swaps reais via Jupiter
         try:
             signals = self.strategies.get_new_trade_signals(before_counts)
+
+            # Auto-funding: se tem sinais e pouco USDC, converte SOL->USDC
+            if signals and not config.PAPER_TRADING:
+                usdc_bal = self.wallet_monitor.last_usdc_balance if self.wallet_monitor else 0
+                sol_bal = self.wallet_monitor.last_sol_balance if self.wallet_monitor else 0
+                total_needed = sum(s["amount_usd"] for s in signals)
+                if usdc_bal < total_needed and sol_bal > 0.01:
+                    fund_usd = total_needed - usdc_bal + 0.01  # pequena margem
+                    sol_price = current_price if current_price > 0 else 100
+                    sol_needed = fund_usd / sol_price
+                    # Garante que não usa mais que 90% do SOL (reserva para fees)
+                    sol_to_sell = min(sol_needed, sol_bal * 0.9)
+                    sol_lamports = int(sol_to_sell * (10 ** 9))
+                    if sol_lamports > 0:
+                        logger.info(
+                            f"[MODO REAL] Auto-funding: vendendo {sol_to_sell:.6f} SOL "
+                            f"(~${fund_usd:.2f}) para USDC"
+                        )
+                        sol_mint = config.TOKENS["SOL"]
+                        usdc_mint_f = config.TOKENS["USDC"]
+                        fund_quote = await self.executor.get_quote(
+                            sol_mint, usdc_mint_f, sol_lamports
+                        )
+                        if fund_quote:
+                            fund_tx = await self.executor.execute_swap(fund_quote)
+                            if fund_tx:
+                                funded = int(fund_quote.get("outAmount", 0)) / (10 ** 6)
+                                logger.info(
+                                    f"[MODO REAL] Auto-funding OK: +${funded:.4f} USDC | TX: {fund_tx}"
+                                )
+                                # Atualiza saldo USDC em memoria
+                                if self.wallet_monitor:
+                                    self.wallet_monitor.last_usdc_balance += funded
+                                    self.wallet_monitor.last_sol_balance -= sol_to_sell
+                            else:
+                                logger.warning("[MODO REAL] Auto-funding: falha no swap SOL->USDC")
+                        else:
+                            logger.warning("[MODO REAL] Auto-funding: sem quote SOL->USDC")
+
             for sig in signals:
                 strat_key = sig["strategy"]
                 coin = sig["coin"]
