@@ -343,6 +343,63 @@ DASHBOARD_HTML = r"""
         .indicator-bar-fill.bearish { background: linear-gradient(90deg, var(--red), var(--red-dim)); }
         .indicator-bar-fill.neutral { background: var(--text-muted); }
 
+        /* ===== INDICATOR TOGGLE ===== */
+        .indicator-toggle {
+            position: relative;
+            display: inline-block;
+            width: 28px;
+            height: 16px;
+            flex-shrink: 0;
+            margin-right: 8px;
+            cursor: pointer;
+        }
+        .indicator-toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.08);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 12px; height: 12px;
+            left: 2px; top: 2px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+        .indicator-toggle input:checked + .toggle-slider {
+            background: color-mix(in srgb, var(--toggle-color) 25%, transparent);
+            box-shadow: 0 0 8px color-mix(in srgb, var(--toggle-color) 30%, transparent);
+        }
+        .indicator-toggle input:checked + .toggle-slider::before {
+            transform: translateX(12px);
+            background: var(--toggle-color);
+            box-shadow: 0 0 4px var(--toggle-color);
+        }
+
+        /* ===== CHART OVERLAY LEGEND ===== */
+        .chart-legend {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding: 6px 0 0 0;
+        }
+        .chart-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.7em;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .chart-legend-dot {
+            width: 8px; height: 3px;
+            border-radius: 1px;
+        }
+
         /* ===== SIGNALS CARD ===== */
         .signals-card {
             grid-column: 1 / 2;
@@ -613,6 +670,7 @@ DASHBOARD_HTML = r"""
             <div class="chart-container">
                 <canvas id="priceChart"></canvas>
             </div>
+            <div class="chart-legend" id="chart-legend"></div>
         </div>
 
         <div class="card indicators-card">
@@ -622,28 +680,44 @@ DASHBOARD_HTML = r"""
             </div>
             <div id="indicators-list">
                 <div class="indicator-row" id="ind-rsi">
-                    <div>
+                    <label class="indicator-toggle">
+                        <input type="checkbox" id="chk-rsi" onchange="toggleIndicatorOverlay('rsi')" />
+                        <span class="toggle-slider" style="--toggle-color:#ffaa00"></span>
+                    </label>
+                    <div style="flex:1;min-width:0">
                         <div class="indicator-name"><span class="indicator-dot neutral"></span> RSI</div>
                         <div class="indicator-bar"><div class="indicator-bar-fill neutral" style="width:50%"></div></div>
                     </div>
                     <div class="indicator-value">--</div>
                 </div>
                 <div class="indicator-row" id="ind-ema">
-                    <div>
+                    <label class="indicator-toggle">
+                        <input type="checkbox" id="chk-ema" onchange="toggleIndicatorOverlay('ema')" />
+                        <span class="toggle-slider" style="--toggle-color:#00aaff"></span>
+                    </label>
+                    <div style="flex:1;min-width:0">
                         <div class="indicator-name"><span class="indicator-dot neutral"></span> EMA</div>
                         <div class="indicator-bar"><div class="indicator-bar-fill neutral" style="width:50%"></div></div>
                     </div>
                     <div class="indicator-value">--</div>
                 </div>
                 <div class="indicator-row" id="ind-ichimoku">
-                    <div>
+                    <label class="indicator-toggle">
+                        <input type="checkbox" id="chk-ichimoku" onchange="toggleIndicatorOverlay('ichimoku')" />
+                        <span class="toggle-slider" style="--toggle-color:#ff66ff"></span>
+                    </label>
+                    <div style="flex:1;min-width:0">
                         <div class="indicator-name"><span class="indicator-dot neutral"></span> Ichimoku</div>
                         <div class="indicator-bar"><div class="indicator-bar-fill neutral" style="width:50%"></div></div>
                     </div>
                     <div class="indicator-value">--</div>
                 </div>
                 <div class="indicator-row" id="ind-volume">
-                    <div>
+                    <label class="indicator-toggle">
+                        <input type="checkbox" id="chk-volume" onchange="toggleIndicatorOverlay('volume')" />
+                        <span class="toggle-slider" style="--toggle-color:#66ffcc"></span>
+                    </label>
+                    <div style="flex:1;min-width:0">
                         <div class="indicator-name"><span class="indicator-dot neutral"></span> Volume</div>
                         <div class="indicator-bar"><div class="indicator-bar-fill neutral" style="width:50%"></div></div>
                     </div>
@@ -707,6 +781,31 @@ let ws = null;
 let wsReconnectTimer = null;
 let lastPrice = 0;
 let prevPrice = 0;
+
+// Indicator overlays
+const indicatorOverlays = {
+    rsi:      { enabled: false, color: '#ffaa00', label: 'RSI',      history: [], min: 0, max: 100 },
+    ema:      { enabled: false, color: '#00aaff', label: 'EMA',      history: [], min: -1, max: 1 },
+    ichimoku: { enabled: false, color: '#ff66ff', label: 'Ichimoku', history: [], min: -1, max: 1 },
+    volume:   { enabled: false, color: '#66ffcc', label: 'Volume',   history: [], min: 0, max: 3 }
+};
+
+function toggleIndicatorOverlay(id) {
+    indicatorOverlays[id].enabled = document.getElementById('chk-' + id).checked;
+    updateChartLegend();
+    drawChart();
+}
+
+function updateChartLegend() {
+    const legend = document.getElementById('chart-legend');
+    let html = '';
+    for (const [id, ind] of Object.entries(indicatorOverlays)) {
+        if (ind.enabled) {
+            html += '<div class="chart-legend-item"><span class="chart-legend-dot" style="background:' + ind.color + '"></span>' + ind.label + '</div>';
+        }
+    }
+    legend.innerHTML = html;
+}
 
 // ============================================================
 // WEBSOCKET
@@ -833,6 +932,18 @@ function updateDashboard(data) {
             if (v < 0.5) return 'bearish';
             return 'neutral';
         }, v => v.toFixed(2) + 'x');
+
+        // Store indicator history for chart overlay
+        const indMap = { rsi: 'RSI', ema: 'EMA', ichimoku: 'Ichimoku', volume: 'Volume' };
+        for (const [key, dataKey] of Object.entries(indMap)) {
+            const val = data.indicators[dataKey];
+            if (val !== undefined && val !== null) {
+                indicatorOverlays[key].history.push({ time: new Date(), value: val });
+                if (indicatorOverlays[key].history.length > 500) {
+                    indicatorOverlays[key].history = indicatorOverlays[key].history.slice(-500);
+                }
+            }
+        }
     }
 
     // Signal
@@ -1031,6 +1142,69 @@ function drawChart() {
     ctx.font = 'bold 11px JetBrains Mono';
     ctx.textAlign = 'right';
     ctx.fillText('$' + prices[prices.length - 1].toFixed(2), lastX - 12, lastY - 10);
+
+    // ---- Draw indicator overlays ----
+    const activeOverlays = Object.values(indicatorOverlays).filter(o => o.enabled && o.history.length >= 2);
+    if (activeOverlays.length > 0) {
+        // Right-side Y axis area for indicators
+        const indAxisX = W - padRight + 2;
+
+        activeOverlays.forEach((ind, idx) => {
+            let indData = ind.history;
+            if (chartRange > 0) indData = indData.slice(-chartRange);
+            if (indData.length < 2) return;
+
+            // Align indicator data length to price data length
+            const len = Math.min(indData.length, prices.length);
+            const alignedInd = indData.slice(-len);
+
+            const indMin = ind.min;
+            const indMax = ind.max;
+            const indRange = indMax - indMin || 1;
+
+            // Draw indicator line with glow
+            ctx.save();
+            ctx.globalAlpha = 0.25;
+            ctx.strokeStyle = ind.color;
+            ctx.lineWidth = 4;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            for (let i = 0; i < alignedInd.length; i++) {
+                const x = padLeft + ((prices.length - len + i) / (prices.length - 1)) * chartW;
+                const y = padTop + ((indMax - alignedInd[i].value) / indRange) * chartH;
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            ctx.restore();
+
+            // Main indicator line
+            ctx.save();
+            ctx.globalAlpha = 0.85;
+            ctx.strokeStyle = ind.color;
+            ctx.lineWidth = 1.5;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.setLineDash([4, 3]);
+            ctx.beginPath();
+            for (let i = 0; i < alignedInd.length; i++) {
+                const x = padLeft + ((prices.length - len + i) / (prices.length - 1)) * chartW;
+                const y = padTop + ((indMax - alignedInd[i].value) / indRange) * chartH;
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Current value label on the right edge
+            const lastVal = alignedInd[alignedInd.length - 1].value;
+            const lastIndY = padTop + ((indMax - lastVal) / indRange) * chartH;
+            ctx.fillStyle = ind.color;
+            ctx.font = 'bold 9px JetBrains Mono';
+            ctx.textAlign = 'left';
+            ctx.fillText(ind.label + ' ' + lastVal.toFixed(1), padLeft + 4, lastIndY - 5);
+            ctx.restore();
+        });
+    }
 }
 
 function setChartRange(n) {

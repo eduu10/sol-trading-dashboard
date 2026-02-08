@@ -207,6 +207,15 @@ def get_dashboard_html():
         .indicator-bar-fill.bullish { background: linear-gradient(90deg, var(--green-dim), var(--green)); }
         .indicator-bar-fill.bearish { background: linear-gradient(90deg, var(--red), var(--red-dim)); }
         .indicator-bar-fill.neutral { background: var(--text-muted); }
+        .indicator-toggle { position: relative; display: inline-block; width: 28px; height: 16px; flex-shrink: 0; margin-right: 8px; cursor: pointer; }
+        .indicator-toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.08); border-radius: 8px; transition: all 0.3s ease; }
+        .toggle-slider::before { content: ''; position: absolute; width: 12px; height: 12px; left: 2px; top: 2px; background: var(--text-muted); border-radius: 50%; transition: all 0.3s ease; }
+        .indicator-toggle input:checked + .toggle-slider { background: color-mix(in srgb, var(--toggle-color) 25%, transparent); box-shadow: 0 0 8px color-mix(in srgb, var(--toggle-color) 30%, transparent); }
+        .indicator-toggle input:checked + .toggle-slider::before { transform: translateX(12px); background: var(--toggle-color); box-shadow: 0 0 4px var(--toggle-color); }
+        .chart-legend { display: flex; gap: 10px; flex-wrap: wrap; padding: 6px 0 0 0; }
+        .chart-legend-item { display: flex; align-items: center; gap: 4px; font-size: 0.7em; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
+        .chart-legend-dot { width: 8px; height: 3px; border-radius: 1px; }
         .signals-card { grid-column: 1 / 2; }
         .signal-badge {
             display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px;
@@ -321,14 +330,15 @@ def get_dashboard_html():
                 </div>
             </div>
             <div class="chart-container"><canvas id="priceChart"></canvas></div>
+            <div class="chart-legend" id="chart-legend"></div>
         </div>
         <div class="card indicators-card">
             <div class="card-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg> Indicadores</div>
             <div id="indicators-list">
-                <div class="indicator-row" id="ind-rsi"><div><div class="indicator-name"><span class="indicator-dot neutral"></span> RSI</div><div class="indicator-bar"><div class="indicator-bar-fill neutral" style="width:50%"></div></div></div><div class="indicator-value">--</div></div>
-                <div class="indicator-row" id="ind-ema"><div><div class="indicator-name"><span class="indicator-dot neutral"></span> EMA</div><div class="indicator-bar"><div class="indicator-bar-fill neutral" style="width:50%"></div></div></div><div class="indicator-value">--</div></div>
-                <div class="indicator-row" id="ind-ichimoku"><div><div class="indicator-name"><span class="indicator-dot neutral"></span> Ichimoku</div><div class="indicator-bar"><div class="indicator-bar-fill neutral" style="width:50%"></div></div></div><div class="indicator-value">--</div></div>
-                <div class="indicator-row" id="ind-volume"><div><div class="indicator-name"><span class="indicator-dot neutral"></span> Volume</div><div class="indicator-bar"><div class="indicator-bar-fill neutral" style="width:50%"></div></div></div><div class="indicator-value">--</div></div>
+                <div class="indicator-row" id="ind-rsi"><label class="indicator-toggle"><input type="checkbox" id="chk-rsi" onchange="toggleIndicatorOverlay('rsi')"/><span class="toggle-slider" style="--toggle-color:#ffaa00"></span></label><div style="flex:1;min-width:0"><div class="indicator-name"><span class="indicator-dot neutral"></span> RSI</div><div class="indicator-bar"><div class="indicator-bar-fill neutral" style="width:50%"></div></div></div><div class="indicator-value">--</div></div>
+                <div class="indicator-row" id="ind-ema"><label class="indicator-toggle"><input type="checkbox" id="chk-ema" onchange="toggleIndicatorOverlay('ema')"/><span class="toggle-slider" style="--toggle-color:#00aaff"></span></label><div style="flex:1;min-width:0"><div class="indicator-name"><span class="indicator-dot neutral"></span> EMA</div><div class="indicator-bar"><div class="indicator-bar-fill neutral" style="width:50%"></div></div></div><div class="indicator-value">--</div></div>
+                <div class="indicator-row" id="ind-ichimoku"><label class="indicator-toggle"><input type="checkbox" id="chk-ichimoku" onchange="toggleIndicatorOverlay('ichimoku')"/><span class="toggle-slider" style="--toggle-color:#ff66ff"></span></label><div style="flex:1;min-width:0"><div class="indicator-name"><span class="indicator-dot neutral"></span> Ichimoku</div><div class="indicator-bar"><div class="indicator-bar-fill neutral" style="width:50%"></div></div></div><div class="indicator-value">--</div></div>
+                <div class="indicator-row" id="ind-volume"><label class="indicator-toggle"><input type="checkbox" id="chk-volume" onchange="toggleIndicatorOverlay('volume')"/><span class="toggle-slider" style="--toggle-color:#66ffcc"></span></label><div style="flex:1;min-width:0"><div class="indicator-name"><span class="indicator-dot neutral"></span> Volume</div><div class="indicator-bar"><div class="indicator-bar-fill neutral" style="width:50%"></div></div></div><div class="indicator-value">--</div></div>
             </div>
         </div>
         <div class="card signals-card">
@@ -358,6 +368,16 @@ let priceHistory = [];
 let chartRange = 50;
 let lastPrice = 0;
 let prevPrice = 0;
+const indicatorOverlays = {
+    rsi:      { enabled: false, color: '#ffaa00', label: 'RSI',      history: [], min: 0, max: 100 },
+    ema:      { enabled: false, color: '#00aaff', label: 'EMA',      history: [], min: -1, max: 1 },
+    ichimoku: { enabled: false, color: '#ff66ff', label: 'Ichimoku', history: [], min: -1, max: 1 },
+    volume:   { enabled: false, color: '#66ffcc', label: 'Volume',   history: [], min: 0, max: 3 }
+};
+function toggleIndicatorOverlay(id) { indicatorOverlays[id].enabled = document.getElementById('chk-' + id).checked; updateChartLegend(); drawChart(); }
+function updateChartLegend() { const legend = document.getElementById('chart-legend'); let html = '';
+    for (const [id, ind] of Object.entries(indicatorOverlays)) { if (ind.enabled) html += '<div class="chart-legend-item"><span class="chart-legend-dot" style="background:' + ind.color + '"></span>' + ind.label + '</div>'; }
+    legend.innerHTML = html; }
 
 async function pollData() {
     try {
@@ -410,6 +430,8 @@ function updateDashboard(data) {
         updateIndicator('ema','EMA',data.indicators.EMA,-1,1,v=>{if(v>0.2)return'bullish';if(v<-0.2)return'bearish';return'neutral';},v=>v.toFixed(2));
         updateIndicator('ichimoku','Ichimoku',data.indicators.Ichimoku,-1,1,v=>{if(v>0.2)return'bullish';if(v<-0.2)return'bearish';return'neutral';},v=>v.toFixed(2));
         updateIndicator('volume','Volume',data.indicators.Volume,0,3,v=>{if(v>1.5)return'bullish';if(v<0.5)return'bearish';return'neutral';},v=>v.toFixed(2)+'x');
+        const indMap={rsi:'RSI',ema:'EMA',ichimoku:'Ichimoku',volume:'Volume'};
+        for(const[key,dk]of Object.entries(indMap)){const val=data.indicators[dk];if(val!==undefined&&val!==null){indicatorOverlays[key].history.push({time:new Date(),value:val});if(indicatorOverlays[key].history.length>500)indicatorOverlays[key].history=indicatorOverlays[key].history.slice(-500);}}
     }
     if(data.last_signal){const sig=data.last_signal;const sb=document.getElementById('signal-badge');
         if(sig.direction==='long'){sb.className='signal-badge signal-long';sb.innerHTML='<span>&#9650; LONG (COMPRA)</span>';}
@@ -438,7 +460,15 @@ function drawChart(){const canvas=document.getElementById('priceChart');if(!canv
     const grad=ctx.createLinearGradient(0,pT,0,H-pB);if(isUp){grad.addColorStop(0,'rgba(0,255,136,0.15)');grad.addColorStop(1,'rgba(0,255,136,0)');}else{grad.addColorStop(0,'rgba(255,68,102,0.15)');grad.addColorStop(1,'rgba(255,68,102,0)');}
     ctx.lineTo(pL+cW,pT+cH);ctx.lineTo(pL,pT+cH);ctx.closePath();ctx.fillStyle=grad;ctx.fill();
     const lX=pL+cW,lY=pT+((maxP-prices[prices.length-1])/range)*cH;ctx.beginPath();ctx.arc(lX,lY,4,0,Math.PI*2);ctx.fillStyle=lc;ctx.fill();ctx.beginPath();ctx.arc(lX,lY,8,0,Math.PI*2);ctx.fillStyle=gc;ctx.fill();
-    ctx.fillStyle=lc;ctx.font='bold 11px JetBrains Mono';ctx.textAlign='right';ctx.fillText('$'+prices[prices.length-1].toFixed(2),lX-12,lY-10);}
+    ctx.fillStyle=lc;ctx.font='bold 11px JetBrains Mono';ctx.textAlign='right';ctx.fillText('$'+prices[prices.length-1].toFixed(2),lX-12,lY-10);
+    const activeOvl=Object.values(indicatorOverlays).filter(o=>o.enabled&&o.history.length>=2);
+    if(activeOvl.length>0){activeOvl.forEach(ind=>{let indData=ind.history;if(chartRange>0)indData=indData.slice(-chartRange);if(indData.length<2)return;
+        const len=Math.min(indData.length,prices.length);const aligned=indData.slice(-len);const iMin=ind.min;const iMax=ind.max;const iR=iMax-iMin||1;
+        ctx.save();ctx.globalAlpha=0.25;ctx.strokeStyle=ind.color;ctx.lineWidth=4;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();
+        for(let i=0;i<aligned.length;i++){const x=pL+((prices.length-len+i)/(prices.length-1))*cW;const y=pT+((iMax-aligned[i].value)/iR)*cH;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.stroke();ctx.restore();
+        ctx.save();ctx.globalAlpha=0.85;ctx.strokeStyle=ind.color;ctx.lineWidth=1.5;ctx.lineJoin='round';ctx.lineCap='round';ctx.setLineDash([4,3]);ctx.beginPath();
+        for(let i=0;i<aligned.length;i++){const x=pL+((prices.length-len+i)/(prices.length-1))*cW;const y=pT+((iMax-aligned[i].value)/iR)*cH;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.stroke();ctx.setLineDash([]);
+        const lastVal=aligned[aligned.length-1].value;const lastIY=pT+((iMax-lastVal)/iR)*cH;ctx.fillStyle=ind.color;ctx.font='bold 9px JetBrains Mono';ctx.textAlign='left';ctx.fillText(ind.label+' '+lastVal.toFixed(1),pL+4,lastIY-5);ctx.restore();});}}
 function setChartRange(n){chartRange=n;document.querySelectorAll('.chart-tab').forEach(t=>t.classList.remove('active'));event.target.classList.add('active');drawChart();}
 window.addEventListener('resize',drawChart);
 setInterval(pollData, 5000);
