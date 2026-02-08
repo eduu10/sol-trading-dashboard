@@ -1455,11 +1455,18 @@ async def handle_push_data(request):
 
     try:
         data = await request.json()
+        # Se bot confirma que aplicou settings, limpa pending
+        if data.get("settings_applied"):
+            BOT_DATA.pop("pending_settings", None)
         BOT_DATA.update(data)
         BOT_DATA["last_push"] = time.time()
         # Retorna comandos pendentes para o bot
         cmds = list(PENDING_COMMANDS)
         PENDING_COMMANDS.clear()
+        # Se ha settings pendentes em BOT_DATA, inclui como comando
+        ps = BOT_DATA.get("pending_settings")
+        if ps and not any(c.get("action") == "save_settings" for c in cmds):
+            cmds.append(ps)
         return web.json_response({"ok": True, "commands": cmds})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=400)
@@ -1520,7 +1527,8 @@ async def handle_deallocate_strategy(request):
 
 
 async def handle_save_settings(request):
-    """Salva configuracoes (private key, paper mode) via comando para o bot."""
+    """Salva configuracoes (private key, paper mode) via comando para o bot.
+    Guarda em BOT_DATA para persistir entre deploys do Render."""
     try:
         data = await request.json()
         pk = data.get("private_key")  # None = nao alterar, string = novo valor
@@ -1530,7 +1538,9 @@ async def handle_save_settings(request):
             cmd["private_key"] = pk
         if paper is not None:
             cmd["paper_trading"] = paper
+        # Guarda tanto na fila normal quanto em BOT_DATA (persiste ate bot pegar)
         PENDING_COMMANDS.append(cmd)
+        BOT_DATA["pending_settings"] = cmd
         return web.json_response({"ok": True, "queued": True})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=400)

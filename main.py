@@ -927,8 +927,10 @@ class TelegramBot:
                 "wallet": wallet_data,
                 "allocations": self.strategies.get_all_allocations(),
                 "pk_mask": (config.SOLANA_PRIVATE_KEY[:4] + "..." + config.SOLANA_PRIVATE_KEY[-4:]) if len(config.SOLANA_PRIVATE_KEY) > 8 else "",
+                "settings_applied": getattr(self, '_settings_applied', False),
             }
             commands = await push_to_cloud(cloud_data)
+            self._settings_applied = False
             # Processa comandos do dashboard na nuvem
             for cmd in commands:
                 action = cmd.get("action", "")
@@ -947,6 +949,7 @@ class TelegramBot:
                         logger.info(f"Desalocacao: {key}")
                 elif action == "save_settings":
                     self._apply_settings(cmd)
+                    self._settings_applied = True
         except Exception as e:
             logger.debug(f"Cloud push prep error: {e}")
 
