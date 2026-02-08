@@ -472,6 +472,43 @@ class TelegramBot:
                 f"⏰ {now_br().strftime('%H:%M - %d/%m/%Y')}\n"
             )
 
+            # Envia resumo das estrategias de teste
+            try:
+                strats = self.strategies.get_all_dashboard_data()
+                strat_lines = []
+                for key, label, emoji in [
+                    ("sniper", "Sniper", "🎯"),
+                    ("memecoin", "MemeCoin", "🐸"),
+                    ("arbitrage", "Arbitragem", "🔄"),
+                    ("scalping", "Scalping", "⚡"),
+                    ("leverage", "Leverage", "📊"),
+                ]:
+                    s = strats.get(key, {})
+                    cap = s.get("capital", {})
+                    cur = cap.get("current", 100)
+                    pnl = cap.get("pnl_usd", 0)
+                    today = cap.get("today_pnl", 0)
+                    invested = cap.get("total_invested", 0)
+                    gains = cap.get("total_gains", 0)
+                    losses = cap.get("total_losses", 0)
+                    pnl_emoji = "🟢" if pnl >= 0 else "🔴"
+                    strat_lines.append(
+                        f"{emoji} *{label}*\n"
+                        f"   💰 ${cur:.2f} | P&L: {pnl_emoji} ${pnl:+.2f}\n"
+                        f"   📥 Inv: ${invested:.2f} | ✅ ${gains:.2f} | ❌ ${losses:.2f}\n"
+                        f"   📅 Hoje: ${today:+.2f}"
+                    )
+                strat_msg = "\n".join(strat_lines)
+                await self.send_message(
+                    f"📋 *ESTRATÉGIAS DE TESTE*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"{strat_msg}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💵 Capital inicial: $100 cada"
+                )
+            except Exception as e:
+                logger.debug(f"Strategies telegram error: {e}")
+
         # 5. Monta relatório de análise (sempre mostra)
         direction_emoji = "🟢" if conf["direction"] == "long" else "🔴"
         confidence_pct = conf["confidence"] * 100
