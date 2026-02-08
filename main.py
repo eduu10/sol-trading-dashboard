@@ -747,6 +747,14 @@ class TelegramBot:
         except Exception as e:
             logger.debug(f"Strategies simulation error: {e}")
 
+        # Atualiza saldo da carteira ANTES dos trades reais (necessário para auto-funding)
+        wallet_data = {}
+        if self.wallet:
+            try:
+                wallet_data = await self.wallet.update_balances()
+            except Exception as e:
+                logger.debug(f"Wallet update error: {e}")
+
         # MODO REAL: detecta novos trades e executa swaps reais via Jupiter
         try:
             signals = self.strategies.get_new_trade_signals(before_counts)
@@ -903,14 +911,6 @@ class TelegramBot:
 
         except Exception as e:
             logger.error(f"Real trade execution error: {e}", exc_info=True)
-
-        # Atualiza saldo da carteira Phantom (read-only)
-        wallet_data = {}
-        if self.wallet:
-            try:
-                wallet_data = await self.wallet.update_balances()
-            except Exception as e:
-                logger.debug(f"Wallet update error: {e}")
 
         # Auto-retirada de lucro: quando PNL total >= R$260, transfere R$150 em SOL para carteira spot
         try:
