@@ -52,10 +52,11 @@ class Position:
 class JupiterExecutor:
     """Executa swaps via Jupiter Aggregator na Solana."""
 
-    def __init__(self):
+    def __init__(self, learning_engine=None):
         self.client = httpx.AsyncClient(timeout=30)
         self.positions: List[Position] = []
         self.closed_positions: List[Position] = []
+        self.learning = learning_engine
         self._load_positions()
 
     async def close(self):
@@ -227,8 +228,9 @@ class JupiterExecutor:
             logger.warning("Máximo de posições atingido!")
             return None
 
-        # Calcula capital por trade
-        risk_amount = config.CAPITAL_USDC * config.RISK_PER_TRADE
+        # Calcula capital por trade (usa risco ajustado pelo aprendizado)
+        effective_risk = self.learning.get_effective_risk_per_trade() if self.learning else config.RISK_PER_TRADE
+        risk_amount = config.CAPITAL_USDC * effective_risk
         risk_per_unit = abs(signal.entry_price - signal.stop_loss)
         if risk_per_unit <= 0:
             return None

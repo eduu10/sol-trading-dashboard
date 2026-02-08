@@ -29,6 +29,7 @@ from confluence import ConfluenceEngine
 from price_data import PriceDataFetcher
 from jupiter_executor import JupiterExecutor
 from dashboard import DashboardServer
+from learning_engine import LearningEngine
 
 # ============================================================
 # LOGGING
@@ -83,8 +84,9 @@ class TelegramBot:
 
         # Módulos
         self.price_fetcher = PriceDataFetcher()
-        self.confluence = ConfluenceEngine()
-        self.executor = JupiterExecutor()
+        self.learning = LearningEngine()
+        self.confluence = ConfluenceEngine(learning_engine=self.learning)
+        self.executor = JupiterExecutor(learning_engine=self.learning)
 
         # Estado
         self.auto_trading = True
@@ -92,6 +94,7 @@ class TelegramBot:
         self.analysis_count = 0
         self.last_indicators = {}
         self.last_hourly_price_hour = -1  # Track last hour we sent price update
+        self.last_daily_review_hour = -1  # Track daily review
 
         # Dashboard Web
         self.dashboard = DashboardServer(self)
@@ -162,6 +165,8 @@ class TelegramBot:
             await self.cmd_report()
         elif cmd == "/positions":
             await self.cmd_positions()
+        elif cmd == "/learn":
+            await self.cmd_learn()
         elif cmd == "/help":
             await self.cmd_help()
         else:
@@ -352,6 +357,18 @@ class TelegramBot:
             return
         await self.cmd_status()
 
+    async def cmd_learn(self):
+        """Mostra status do aprendizado."""
+        report = self.learning.get_telegram_report()
+        await self.send_message(report)
+
+        # Tenta fazer revisao diaria se ainda nao fez
+        daily = self.learning.daily_review()
+        if daily:
+            summary = self.learning.get_daily_summary()
+            if summary:
+                await self.send_message(summary)
+
     async def cmd_help(self):
         await self.send_message(
             "🤖 *Comandos Disponíveis*\n"
@@ -365,6 +382,7 @@ class TelegramBot:
             "/buy - Forçar compra\n"
             "/sell - Vender tudo\n"
             "/report - Relatório P&L\n"
+            "/learn - Status do aprendizado AI\n"
             "/stop - Parar bot\n"
             "/help - Esta mensagem\n"
         )
@@ -473,6 +491,13 @@ class TelegramBot:
         rsi_emoji = "🟢" if 30 < rsi_val < 70 else "🔴"
         vol_emoji = "🟢" if vol_ratio > 0.8 else "🔴"
 
+        # Info do aprendizado
+        learn_threshold = self.learning.get_effective_threshold() * 100
+        risk_lvl = self.learning.state.get("current_risk_level", 1.0)
+        shadow_w = self.learning.state.get("shadow_wins", 0)
+        shadow_l = self.learning.state.get("shadow_losses", 0)
+        open_shadows = sum(1 for t in self.learning.shadow_trades if t["status"] == "open")
+
         analysis_msg = (
             f"📊 *ANÁLISE #{self.analysis_count}*\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -485,6 +510,10 @@ class TelegramBot:
             f"{vol_emoji} Volume: {vol_ratio:.2f}x\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"{ind_text}\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"🧠 *AI Learning:*\n"
+            f"  Threshold: {learn_threshold:.0f}% | Risco: {risk_lvl:.1f}x\n"
+            f"  Shadow: {shadow_w}W/{shadow_l}L ({open_shadows} abertos)\n"
         )
 
         # Envia análise a cada 5 ciclos (para não spammar)
@@ -516,10 +545,58 @@ class TelegramBot:
             data["execution"]
         )
 
+        # 7.1 APRENDIZADO: Registra TODA analise (com ou sem sinal)
+        rejection_reason = getattr(self.confluence, 'last_rejection_reason', '') if not signal else ''
+        self.learning.record_analysis(
+            price=current_price,
+            conf=conf,
+            scores_by_tf=scores_by_tf,
+            signal_generated=signal is not None,
+            rejection_reason=rejection_reason,
+            analysis_number=self.analysis_count,
+        )
+
+        # 7.2 APRENDIZADO: Atualiza precos futuros de analises anteriores
+        self.learning.update_future_prices(current_price)
+
+        # 7.3 APRENDIZADO: Atualiza shadow trades
+        self.learning.update_shadow_trades(current_price)
+
+        # 7.4 APRENDIZADO: Se nao gerou sinal mas esta perto, abre shadow trade
+        if not signal and self.learning.should_open_shadow_trade(conf):
+            # Calcula SL/TP para o shadow trade
+            try:
+                exec_scores_shadow = scores_by_tf.get("execution", {})
+                shadow_sl = self.confluence.calculate_stop_loss(
+                    current_price, conf["direction"], exec_scores_shadow, data["execution"]
+                )
+                shadow_tps = self.confluence.calculate_take_profits(
+                    current_price, conf["direction"], shadow_sl, exec_scores_shadow
+                )
+                self.learning.open_shadow_trade(
+                    conf, current_price, scores_by_tf, shadow_sl, shadow_tps
+                )
+            except Exception as e:
+                logger.debug(f"Shadow trade error: {e}")
+
+        # 7.5 APRENDIZADO: Revisao diaria (1x por dia, as 00:00 UTC)
+        current_review_hour = datetime.now().hour
+        if current_review_hour == 0 and self.last_daily_review_hour != 0:
+            report = self.learning.daily_review()
+            if report:
+                summary = self.learning.get_daily_summary()
+                if summary:
+                    await self.send_message(summary)
+                    learning_report = self.learning.get_telegram_report()
+                    await self.send_message(learning_report)
+        self.last_daily_review_hour = current_review_hour
+
         if signal and self.auto_trading:
             self.last_signal = signal
 
             # ENTRADA DETECTADA - mensagem com ênfase!
+            risk_level = self.learning.state.get("current_risk_level", 1.0)
+            risk_emoji = "🟢" if risk_level >= 1.0 else "🟡" if risk_level >= 0.5 else "🔴"
             entry_msg = (
                 f"🚨🚨🚨 *ENTRADA DETECTADA!* 🚨🚨🚨\n"
                 f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -534,13 +611,15 @@ class TelegramBot:
                 f"━━━━━━━━━━━━━━━━━━━━\n"
                 f"📈 Confiança: *{signal.confidence:.0%}*\n"
                 f"⚖️ Risco/Retorno: *{signal.risk_reward_ratio:.1f}:1*\n"
+                f"{risk_emoji} Risco AI: *{risk_level:.1f}x*\n"
+                f"🧠 Dias aprendendo: *{self.learning.state.get('days_learning', 0)}*\n"
                 f"🔗 DEX: Jupiter (Solana)\n"
                 f"━━━━━━━━━━━━━━━━━━━━\n"
             )
 
             await self.send_message(entry_msg)
 
-            # Executa o trade
+            # Executa o trade (usa risco ajustado pelo aprendizado)
             position = await self.executor.open_position(signal, current_price)
             if position:
                 await self.send_message(
@@ -587,6 +666,17 @@ class TelegramBot:
                     "scores": {k: round(v, 3) for k, v in conf["combined_scores"].items()},
                 },
                 "logs": self.dashboard.logs[-30:],
+                "learning": {
+                    "days": self.learning.state.get("days_learning", 0),
+                    "risk_level": self.learning.state.get("current_risk_level", 1.0),
+                    "threshold": round(self.learning.get_effective_threshold() * 100, 1),
+                    "shadow_wins": self.learning.state.get("shadow_wins", 0),
+                    "shadow_losses": self.learning.state.get("shadow_losses", 0),
+                    "missed_opps": self.learning.state.get("missed_opportunities", 0),
+                    "dodged": self.learning.state.get("dodged_bullets", 0),
+                    "streak": self.learning.state.get("streak", 0),
+                    "total_analyses": self.learning.state.get("total_analyses", 0),
+                },
             }
             await push_to_cloud(cloud_data)
         except Exception as e:

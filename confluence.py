@@ -58,11 +58,12 @@ class TradeSignal:
 
 
 class ConfluenceEngine:
-    def __init__(self):
+    def __init__(self, learning_engine=None):
         self.weights = config.INDICATOR_WEIGHTS.copy()
         self.threshold = config.CONFLUENCE_THRESHOLD
         self.min_agree = config.MIN_INDICATORS_AGREE
         self.trade_history: List[Dict] = []
+        self.learning = learning_engine  # Motor de aprendizado
         self._load_history()
 
     def _load_history(self):
@@ -239,9 +240,22 @@ class ConfluenceEngine:
                         exec_df) -> Optional[TradeSignal]:
         conf = self.calculate_confluence(scores_by_tf)
 
-        if conf["confidence"] < self.threshold:
+        # Usa threshold do learning engine se disponivel
+        threshold = self.threshold
+        if self.learning:
+            threshold = self.learning.get_effective_threshold()
+            # Usa pesos ajustados pelo aprendizado
+            learned_weights = self.learning.get_effective_weights()
+            if learned_weights:
+                self.weights = learned_weights
+
+        self.last_rejection_reason = ""  # Reseta motivo
+
+        if conf["confidence"] < threshold:
+            self.last_rejection_reason = "low_confidence"
             return None
         if conf["agreeing_indicators"] < self.min_agree:
+            self.last_rejection_reason = "few_indicators"
             return None
 
         price = exec_df.iloc[-1]["close"]
@@ -256,20 +270,24 @@ class ConfluenceEngine:
         rr = reward / risk if risk > 0 else 0
 
         if rr < config.MIN_RISK_REWARD:
+            self.last_rejection_reason = "low_rr"
             return None
 
         # FILTRO RSI: não compra em sobrecompra, não vende em sobrevenda
         rsi_data = exec_scores.get("rsi", {})
         rsi_value = rsi_data.get("value", 50)
         if direction == "long" and rsi_value > 70:
+            self.last_rejection_reason = "rsi_filter"
             return None  # Não comprar em sobrecompra
         if direction == "short" and rsi_value < 30:
+            self.last_rejection_reason = "rsi_filter"
             return None  # Não vender em sobrevenda
 
         # FILTRO VOLUME: evita entrar sem volume
         vol_data = exec_scores.get("volume", {})
         vol_ratio = vol_data.get("ratio", 1.0)
         if vol_ratio < 0.5:
+            self.last_rejection_reason = "volume_filter"
             return None  # Volume muito baixo, pode ser armadilha
 
         return TradeSignal(
