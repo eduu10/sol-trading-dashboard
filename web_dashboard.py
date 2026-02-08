@@ -383,7 +383,7 @@ def get_dashboard_html():
         .strategies-title { font-size: 1.1em; font-weight: 700; letter-spacing: -0.3px; }
         .strategies-subtitle { font-size: 0.75em; color: var(--text-muted); padding: 4px 10px; background: rgba(255,170,0,0.08); border: 1px solid rgba(255,170,0,0.15); border-radius: 6px; color: var(--yellow); font-weight: 600; letter-spacing: 0.5px; }
         .strategies-grid {
-            display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px;
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;
         }
         .strat-card {
             background: var(--bg-card); border: 1px solid var(--border-color);
@@ -403,7 +403,7 @@ def get_dashboard_html():
             transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.4);
         }
         .strat-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
-        .strat-name { font-size: 0.85em; font-weight: 700; letter-spacing: -0.2px; line-height: 1.3; max-width: 80%; }
+        .strat-name { font-size: 0.8em; font-weight: 700; letter-spacing: -0.2px; line-height: 1.3; max-width: 80%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .strat-help {
             width: 22px; height: 22px; border-radius: 50%;
             background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
@@ -423,7 +423,7 @@ def get_dashboard_html():
         .strat-tooltip-title { font-weight: 700; color: var(--text-primary); margin-bottom: 8px; font-size: 1em; }
         .strat-tooltip-tools { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.9em; color: var(--text-muted); }
         .strat-tooltip-tools span { color: var(--blue); font-weight: 500; }
-        .strat-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+        .strat-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
         .strat-badge {
             padding: 3px 8px; border-radius: 5px; font-size: 0.6em;
             font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
@@ -438,7 +438,7 @@ def get_dashboard_html():
         .strat-stat-row { display: flex; justify-content: space-between; align-items: center; }
         .strat-stat-label { font-size: 0.68em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
         .strat-stat-value { font-family: 'JetBrains Mono', monospace; font-size: 0.82em; font-weight: 600; }
-        .strat-pnl { font-size: 1.5em; font-weight: 800; font-family: 'JetBrains Mono', monospace; margin: 10px 0 6px 0; letter-spacing: -0.5px; }
+        .strat-pnl { font-size: 1.2em; font-weight: 800; font-family: 'JetBrains Mono', monospace; margin: 8px 0 6px 0; letter-spacing: -0.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .strat-pnl.profit { color: var(--green); text-shadow: 0 0 15px var(--green-glow); }
         .strat-pnl.loss { color: var(--red); text-shadow: 0 0 15px var(--red-glow); }
         .strat-pnl.neutral { color: var(--text-muted); }
@@ -460,11 +460,11 @@ def get_dashboard_html():
         .strat-recent-item { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; font-size: 0.72em; font-family: 'JetBrains Mono', monospace; }
         .strat-recent-name { color: var(--text-secondary); }
         .strat-recent-pnl { font-weight: 600; }
-        .strat-capital { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin: 10px 0; padding: 10px 12px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid var(--border-color); }
-        .strat-cap-item { display: flex; justify-content: space-between; align-items: center; }
-        .strat-cap-label { font-size: 0.7em; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
-        .strat-cap-value { font-family: 'JetBrains Mono', monospace; font-size: 0.82em; font-weight: 700; }
-        .strat-cap-full { grid-column: 1 / 3; border-top: 1px solid var(--border-color); padding-top: 6px; margin-top: 3px; }
+        .strat-capital { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; margin: 10px 0; padding: 8px 10px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid var(--border-color); overflow: hidden; }
+        .strat-cap-item { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+        .strat-cap-label { font-size: 0.6em; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .strat-cap-value { font-family: 'JetBrains Mono', monospace; font-size: 0.75em; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .strat-cap-full { grid-column: 1 / 3; border-top: 1px solid var(--border-color); padding-top: 4px; margin-top: 2px; }
         @media (max-width: 1024px) {
             .main { grid-template-columns: 1fr 1fr; }
             .chart-card, .positions-card, .log-card, .analysis-card { grid-column: 1 / 3; }
@@ -472,7 +472,6 @@ def get_dashboard_html():
             .signals-card { grid-column: 2 / 3; }
             .price-card, .pnl-card, .status-card { grid-column: auto; }
             .wallet-card, .strategies-section { grid-column: 1 / 3; }
-            .strategies-grid { grid-template-columns: repeat(3, 1fr); }
         }
         @media (max-width: 768px) {
             .main { grid-template-columns: 1fr; padding: 12px; }
@@ -481,15 +480,11 @@ def get_dashboard_html():
             .wallet-card, .strategies-section { grid-column: 1 / 2; }
             .wallet-inner { gap: 12px; }
             .wallet-balances { gap: 16px; }
-            .wallet-readonly { margin-left: 0; }
-            .strategies-grid { grid-template-columns: 1fr 1fr; }
+            .alloc-select { min-width: 140px; }
             .price-main { font-size: 2.2em; }
             .header { padding: 14px 16px; }
             .header-title { font-size: 1em; }
             .position-item { grid-template-columns: 1fr 1fr; }
-        }
-        @media (max-width: 480px) {
-            .strategies-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -590,12 +585,20 @@ def get_dashboard_html():
                 <div class="wallet-alloc-title">Alocar Capital Real</div>
                 <div class="wallet-alloc-form">
                     <select id="alloc-strategy" class="alloc-select">
-                        <option value="">Escolha a estrategia...</option>
+                        <option value="">Estrategia...</option>
                         <option value="sniper">Sniping Pump.fun</option>
                         <option value="memecoin">Meme Coins</option>
                         <option value="arbitrage">Arbitragem DEX</option>
                         <option value="scalping">Scalping Tokens</option>
                         <option value="leverage">Leverage Trading</option>
+                    </select>
+                    <select id="alloc-coin" class="alloc-select" style="min-width:120px">
+                        <option value="SOL">SOL</option>
+                        <option value="USDC">USDC</option>
+                        <option value="USDT">USDT</option>
+                        <option value="JUP">JUP</option>
+                        <option value="BONK">BONK</option>
+                        <option value="WBTC">WBTC</option>
                     </select>
                     <div class="alloc-amount-wrap">
                         <span class="alloc-currency">$</span>
@@ -1010,18 +1013,20 @@ async function toggleStrategy(key){
 let activeAllocations={};
 async function allocateStrategy(){
     const sel=document.getElementById('alloc-strategy');
+    const coinSel=document.getElementById('alloc-coin');
     const inp=document.getElementById('alloc-amount');
     const strategy=sel.value;
+    const coin=coinSel.value;
     const amount=parseFloat(inp.value);
     if(!strategy){alert('Escolha uma estrategia!');return;}
     if(!amount||amount<=0){alert('Informe um valor valido!');return;}
     const btn=document.getElementById('alloc-play-btn');
     btn.disabled=true;btn.textContent='Enviando...';
     try{
-        const resp=await fetch('/api/allocate-strategy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:strategy,amount:amount})});
+        const resp=await fetch('/api/allocate-strategy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:strategy,amount:amount,coin:coin})});
         const data=await resp.json();
         if(data.ok){
-            activeAllocations[strategy]={amount:amount,status:'active'};
+            activeAllocations[strategy]={amount:amount,coin:coin,status:'active'};
             renderAllocations();
             sel.value='';inp.value='';
         }else{alert('Erro: '+(data.error||'desconhecido'));}
@@ -1047,7 +1052,7 @@ function renderAllocations(){
         const a=activeAllocations[k];
         html+=`<div class="alloc-active-item">
             <span class="alloc-strat-name">${nameMap[k]||k}</span>
-            <span class="alloc-strat-amount">$${a.amount.toFixed(2)}</span>
+            <span class="alloc-strat-amount">$${a.amount.toFixed(2)} ${a.coin||'SOL'}</span>
             <span class="alloc-strat-status">ATIVO</span>
             <button class="alloc-stop-btn" onclick="deallocateStrategy('${k}')">
                 <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> Stop
@@ -1060,7 +1065,7 @@ function updateAllocationsFromData(allocData){
     if(!allocData)return;
     activeAllocations={};
     for(const[k,v]of Object.entries(allocData)){
-        if(v.active)activeAllocations[k]={amount:v.amount,status:'active'};
+        if(v.active)activeAllocations[k]={amount:v.amount,coin:v.coin||'SOL',status:'active'};
     }
     renderAllocations();
 }
@@ -1218,6 +1223,7 @@ async def handle_allocate_strategy(request):
         data = await request.json()
         key = data.get("strategy", "")
         amount = float(data.get("amount", 0))
+        coin = data.get("coin", "SOL")
         valid_keys = ["sniper", "memecoin", "arbitrage", "scalping", "leverage"]
         if key not in valid_keys:
             return web.json_response({"error": "invalid strategy"}, status=400)
@@ -1227,8 +1233,9 @@ async def handle_allocate_strategy(request):
             "action": "allocate_strategy",
             "strategy": key,
             "amount": amount,
+            "coin": coin,
         })
-        return web.json_response({"ok": True, "strategy": key, "amount": amount, "queued": True})
+        return web.json_response({"ok": True, "strategy": key, "amount": amount, "coin": coin, "queued": True})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=400)
 

@@ -793,6 +793,12 @@ class TelegramBot:
             except Exception as e:
                 logger.debug(f"Wallet update error: {e}")
 
+        # Auto-retirada de lucro: quando PNL total >= R$260, transfere R$150 em SOL para carteira spot
+        try:
+            await self._check_profit_withdraw(current_price)
+        except Exception as e:
+            logger.debug(f"Profit withdraw check error: {e}")
+
         # Push para dashboard na nuvem
         try:
             dashboard = self.executor.get_dashboard_data(current_price)
@@ -851,14 +857,108 @@ class TelegramBot:
                 elif action == "allocate_strategy":
                     key = cmd.get("strategy", "")
                     amount = float(cmd.get("amount", 0))
-                    if self.strategies.allocate_strategy(key, amount):
-                        logger.info(f"Alocacao real: ${amount:.2f} -> {key}")
+                    coin = cmd.get("coin", "SOL")
+                    if self.strategies.allocate_strategy(key, amount, coin):
+                        logger.info(f"Alocacao real: ${amount:.2f} {coin} -> {key}")
                 elif action == "deallocate_strategy":
                     key = cmd.get("strategy", "")
                     if self.strategies.deallocate_strategy(key):
                         logger.info(f"Desalocacao: {key}")
         except Exception as e:
             logger.debug(f"Cloud push prep error: {e}")
+
+    # --------------------------------------------------------
+    # AUTO-RETIRADA DE LUCRO
+    # --------------------------------------------------------
+    async def _check_profit_withdraw(self, current_price: float):
+        """
+        Verifica se o lucro total atingiu R$260.
+        Se sim, transfere R$150 em SOL para carteira spot.
+        """
+        if not config.SOLANA_PRIVATE_KEY or config.PAPER_TRADING:
+            return  # Precisa de private key e modo real
+
+        spot_wallet = getattr(config, "SOLANA_SPOT_WALLET", "")
+        if not spot_wallet:
+            return
+
+        threshold_brl = getattr(config, "PROFIT_WITHDRAW_THRESHOLD_BRL", 260.0)
+        withdraw_brl = getattr(config, "PROFIT_WITHDRAW_AMOUNT_BRL", 150.0)
+        usd_brl = getattr(config, "USD_TO_BRL", 5.80)
+
+        # Calcula PNL total de todas as alocacoes
+        total_pnl_usd = 0
+        for key, alloc in self.strategies.allocations.items():
+            total_pnl_usd += alloc.get("pnl", 0)
+
+        total_pnl_brl = total_pnl_usd * usd_brl
+
+        if total_pnl_brl < threshold_brl:
+            return
+
+        # Verifica se ja fez retirada recente (cooldown 1h)
+        last_withdraw = getattr(self, "_last_profit_withdraw", 0)
+        import time as _time
+        if _time.time() - last_withdraw < 3600:
+            return
+
+        # Calcula quanto SOL transferir
+        withdraw_usd = withdraw_brl / usd_brl
+        if current_price <= 0:
+            return
+        sol_amount = withdraw_usd / current_price
+        lamports = int(sol_amount * 1_000_000_000)
+
+        logger.info(
+            f"[AUTO-WITHDRAW] Lucro R${total_pnl_brl:.2f} >= R${threshold_brl:.2f}. "
+            f"Transferindo R${withdraw_brl:.2f} (~{sol_amount:.4f} SOL) para {spot_wallet[:8]}..."
+        )
+
+        try:
+            from solders.keypair import Keypair
+            from solders.pubkey import Pubkey
+            from solders.system_program import transfer, TransferParams
+            from solders.transaction import Transaction
+            from solders.message import Message
+            from solana.rpc.async_api import AsyncClient as SolanaClient
+
+            keypair = Keypair.from_base58_string(config.SOLANA_PRIVATE_KEY)
+            destination = Pubkey.from_string(spot_wallet)
+
+            client = SolanaClient(config.SOLANA_RPC_URL)
+            blockhash_resp = await client.get_latest_blockhash()
+            blockhash = blockhash_resp.value.blockhash
+
+            ix = transfer(TransferParams(
+                from_pubkey=keypair.pubkey(),
+                to_pubkey=destination,
+                lamports=lamports,
+            ))
+            msg = Message.new_with_blockhash([ix], keypair.pubkey(), blockhash)
+            tx = Transaction.new_unsigned(msg)
+            tx.sign([keypair], blockhash)
+
+            result = await client.send_transaction(tx)
+            await client.close()
+
+            tx_hash = str(result.value)
+            self._last_profit_withdraw = _time.time()
+
+            logger.info(f"[AUTO-WITHDRAW] TX: {tx_hash}")
+            await self.send_message(
+                f"💸 *AUTO-RETIRADA DE LUCRO*\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"📈 Lucro total: R${total_pnl_brl:.2f}\n"
+                f"💰 Transferido: R${withdraw_brl:.2f} (~{sol_amount:.4f} SOL)\n"
+                f"📬 Para: `{spot_wallet[:8]}...{spot_wallet[-4:]}`\n"
+                f"🔗 TX: `{tx_hash}`\n"
+                f"━━━━━━━━━━━━━━━━━━━━"
+            )
+
+        except ImportError:
+            logger.error("[AUTO-WITHDRAW] solders/solana nao instalado")
+        except Exception as e:
+            logger.error(f"[AUTO-WITHDRAW] Erro na transferencia: {e}")
 
     # --------------------------------------------------------
     # LOOP DE TELEGRAM (recebe comandos)

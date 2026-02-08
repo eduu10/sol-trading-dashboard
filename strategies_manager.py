@@ -113,7 +113,7 @@ class StrategiesManager:
         with open("allocations.json", "w") as f:
             json.dump(self.allocations, f, indent=2)
 
-    def allocate_strategy(self, key: str, amount: float) -> bool:
+    def allocate_strategy(self, key: str, amount: float, coin: str = "SOL") -> bool:
         """Aloca capital real para uma estrategia."""
         if key not in self.STRATEGY_KEYS:
             return False
@@ -121,6 +121,7 @@ class StrategiesManager:
             return False
         self.allocations[key] = {
             "amount": amount,
+            "coin": coin,
             "active": True,
             "allocated_at": time.time(),
             "pnl": 0.0,

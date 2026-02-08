@@ -17,6 +17,14 @@ AUTHORIZED_USERS = []            # Lista de user IDs autorizados
 SOLANA_WALLET_ADDRESS = "AMg37YRKSJN68tpxpPtGm3BdVkd7Zg2zjLD6B5GDy9gi"  # Endereço público (Phantom)
 SOLANA_PRIVATE_KEY = ""           # Private key Base58 (só para trades reais - NÃO compartilhe!)
 SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com"
+SOLANA_SPOT_WALLET = "EMLKA6asnC1eiPrnuxmGkUatWiftdpQzMDdJHeTogHrc"  # Carteira spot para receber lucros
+
+# ============================================================
+# AUTO-RETIRADA DE LUCRO
+# ============================================================
+PROFIT_WITHDRAW_THRESHOLD_BRL = 260.0   # Quando lucro atingir R$260...
+PROFIT_WITHDRAW_AMOUNT_BRL = 150.0      # ...transfere R$150 para carteira spot
+USD_TO_BRL = 5.80                       # Cotação aproximada USD/BRL
 
 # ============================================================
 # TOKENS - Solana Mint Addresses
