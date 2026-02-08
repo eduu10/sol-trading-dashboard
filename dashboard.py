@@ -140,12 +140,13 @@ DASHBOARD_HTML = r"""
         .mode-paper { background: var(--yellow-dark); color: var(--yellow); border: 1px solid rgba(255,170,0,0.2); }
         .mode-live { background: var(--red-dark); color: var(--red); border: 1px solid rgba(255,68,102,0.2); }
         .settings-btn {
-            background: none; border: none; cursor: pointer; padding: 6px;
-            color: var(--text-secondary); transition: color 0.2s, transform 0.2s;
+            background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); cursor: pointer;
+            padding: 8px; border-radius: 10px;
+            color: var(--text-primary); transition: all 0.2s;
             display: flex; align-items: center; justify-content: center;
         }
-        .settings-btn:hover { color: var(--text-primary); transform: rotate(45deg); }
-        .settings-btn svg { width: 20px; height: 20px; }
+        .settings-btn:hover { background: rgba(255,255,255,0.12); transform: rotate(45deg); border-color: var(--purple); color: var(--purple); }
+        .settings-btn svg { width: 22px; height: 22px; }
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
