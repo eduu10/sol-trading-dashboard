@@ -582,11 +582,11 @@ DASHBOARD_HTML = r"""
         .strat-recent-item { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; font-size: 0.72em; font-family: 'JetBrains Mono', monospace; }
         .strat-recent-name { color: var(--text-secondary); }
         .strat-recent-pnl { font-weight: 600; }
-        .strat-capital { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; margin: 10px 0; padding: 8px 10px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid var(--border-color); }
+        .strat-capital { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin: 10px 0; padding: 10px 12px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid var(--border-color); }
         .strat-cap-item { display: flex; justify-content: space-between; align-items: center; }
-        .strat-cap-label { font-size: 0.6em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-        .strat-cap-value { font-family: 'JetBrains Mono', monospace; font-size: 0.72em; font-weight: 600; }
-        .strat-cap-full { grid-column: 1 / 3; border-top: 1px solid var(--border-color); padding-top: 4px; margin-top: 2px; }
+        .strat-cap-label { font-size: 0.7em; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .strat-cap-value { font-family: 'JetBrains Mono', monospace; font-size: 0.82em; font-weight: 700; }
+        .strat-cap-full { grid-column: 1 / 3; border-top: 1px solid var(--border-color); padding-top: 6px; margin-top: 3px; }
 
         /* ===== RESPONSIVE ===== */
         @media (max-width: 1024px) {
