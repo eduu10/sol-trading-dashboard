@@ -9,8 +9,13 @@ import asyncio
 import json
 import logging
 import weakref
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from aiohttp import web
+
+BR_TZ = timezone(timedelta(hours=-3))
+
+def now_br():
+    return datetime.now(BR_TZ)
 import aiohttp
 import config
 
@@ -1248,7 +1253,7 @@ class DashboardServer:
         self._push_task = None
 
     def add_log(self, message: str):
-        timestamp = datetime.now().strftime("%H:%M:%S")
+        timestamp = now_br().strftime("%H:%M:%S")
         self.logs.append(f"{timestamp} {message}")
         if len(self.logs) > self.max_logs:
             self.logs = self.logs[-self.max_logs:]
@@ -1276,7 +1281,7 @@ class DashboardServer:
             "mode": config.TRADE_MODE.replace("_", " ").title(),
             "paper_trading": config.PAPER_TRADING,
             "analysis_count": self.bot.analysis_count,
-            "last_update": datetime.now().strftime("%H:%M:%S"),
+            "last_update": now_br().strftime("%H:%M:%S"),
             "open_positions": dashboard["open_positions"],
             "open_pnl": dashboard["open_pnl_usd"],
             "total_pnl": dashboard["total_pnl_usd"],

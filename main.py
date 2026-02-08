@@ -15,8 +15,13 @@ import signal
 import io
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Dict
+
+BR_TZ = timezone(timedelta(hours=-3))
+
+def now_br():
+    return datetime.now(BR_TZ)
 
 # Fix Windows console encoding for emojis
 if os.name == "nt":
@@ -446,7 +451,7 @@ class TelegramBot:
         self.last_price = current_price
 
         # 4.1 Envia preço do SOL a cada hora no Telegram
-        current_hour = datetime.now().hour
+        current_hour = now_br().hour
         if current_hour != self.last_hourly_price_hour and current_price > 0:
             self.last_hourly_price_hour = current_hour
             n_pos = len(self.executor.positions)
@@ -459,7 +464,7 @@ class TelegramBot:
                 f"📊 P&L Total: *${dash['total_pnl_usd']:+,.2f}*\n"
                 f"📈 Posições: {n_pos} | Trades: {dash['total_trades']}\n"
                 f"🔄 Análises: {self.analysis_count}\n"
-                f"⏰ {datetime.now().strftime('%H:%M - %d/%m/%Y')}\n"
+                f"⏰ {now_br().strftime('%H:%M - %d/%m/%Y')}\n"
             )
 
         # 5. Monta relatório de análise (sempre mostra)
@@ -580,7 +585,7 @@ class TelegramBot:
                 logger.debug(f"Shadow trade error: {e}")
 
         # 7.5 APRENDIZADO: Revisao diaria (1x por dia, as 00:00 UTC)
-        current_review_hour = datetime.now().hour
+        current_review_hour = now_br().hour
         if current_review_hour == 0 and self.last_daily_review_hour != 0:
             report = self.learning.daily_review()
             if report:
@@ -650,7 +655,7 @@ class TelegramBot:
                 "mode": config.TRADE_MODE.replace("_", " ").title(),
                 "paper_trading": config.PAPER_TRADING,
                 "analysis_count": self.analysis_count,
-                "last_update": datetime.now().strftime("%H:%M:%S"),
+                "last_update": now_br().strftime("%H:%M:%S"),
                 "open_positions": dashboard["open_positions"],
                 "open_pnl": dashboard["open_pnl_usd"],
                 "total_pnl": dashboard["total_pnl_usd"],
