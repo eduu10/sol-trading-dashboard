@@ -151,89 +151,95 @@ class StrategiesManager:
         """Retorna todas as alocacoes para o dashboard."""
         return dict(self.allocations)
 
-    def sync_real_from_simulations(self) -> List[Dict]:
+    def _get_trade_count(self, key: str) -> int:
+        """Retorna total de trades de uma estrategia."""
+        strat = getattr(self, key, None)
+        if not strat:
+            return 0
+        data = strat.get_dashboard_data()
+        stats = data.get("stats", {})
+        if key == "sniper":
+            return stats.get("total_snipes", 0)
+        elif key == "arbitrage":
+            return stats.get("executed", 0)
+        return stats.get("total_trades", 0)
+
+    def snapshot_trade_counts(self) -> Dict[str, int]:
+        """Tira foto do total de trades ANTES da simulacao."""
+        return {k: self._get_trade_count(k) for k in self.STRATEGY_KEYS}
+
+    def get_new_trade_signals(self, before_counts: Dict[str, int]) -> List[Dict]:
         """
-        Sincroniza o MODO REAL com as simulacoes.
-        Detecta novos trades completados nas simulacoes e replica o PNL
-        proporcionalmente no capital alocado.
-        Retorna lista de trades replicados (para log/notificacao).
+        Compara trade counts apos simulacao para detectar trades novos.
+        Para estrategias com capital real alocado, retorna sinais de
+        swap para executar via Jupiter.
         """
-        replicated = []
+        signals = []
         for key in self.STRATEGY_KEYS:
             alloc = self.get_allocation(key)
             if not alloc:
                 continue
-            if self.paused.get(key):
+
+            before = before_counts.get(key, 0)
+            after = self._get_trade_count(key)
+            if after <= before:
                 continue
 
+            # Novo trade detectado! Pega detalhes
             strat = getattr(self, key, None)
             if not strat:
                 continue
-
             data = strat.get_dashboard_data()
-            capital = data.get("capital", {})
-
-            # Conta total de trades da simulacao
-            stats = data.get("stats", {})
-            sim_trades = 0
-            if key == "sniper":
-                sim_trades = stats.get("total_snipes", 0)
-            elif key == "arbitrage":
-                sim_trades = stats.get("executed", 0)
-            else:
-                sim_trades = stats.get("total_trades", 0)
-
-            # Quantos trades ja replicamos?
-            last_synced = alloc.get("last_synced_trades", 0)
-            new_trades = sim_trades - last_synced
-
-            if new_trades <= 0:
+            trade_info = self._get_last_trade_info(key, data)
+            if not trade_info:
                 continue
 
-            # Pega o PNL da simulacao (% sobre capital teste $100)
-            sim_pnl_usd = capital.get("pnl_usd", 0)
-            sim_capital = capital.get("initial", 100.0)
-            if sim_capital <= 0:
-                sim_capital = 100.0
-            sim_pnl_pct = (sim_pnl_usd / sim_capital) * 100 if sim_capital else 0
+            # Determina token e direcao do swap
+            coin = alloc.get("coin", "SOL")
+            direction = trade_info.get("direction", "long")
+            # Sniper, memecoin, arbitrage sao sempre long
+            if key in ("sniper", "memecoin", "arbitrage"):
+                direction = "long"
+            pnl_pct = trade_info.get("pnl_pct", 0)
+            won = pnl_pct > 0
 
-            # Calcula PNL real proporcional ao capital alocado
-            real_amount = alloc["amount"]
-            real_pnl = real_amount * (sim_pnl_pct / 100)
+            trade_id = f"{key}_{int(time.time())}_{after}"
 
-            # Pega ultimo trade recente para detalhes
-            last_trade_info = self._get_last_trade_info(key, data)
+            signals.append({
+                "strategy": key,
+                "direction": direction,
+                "amount_usd": alloc["amount"],
+                "coin": coin,
+                "trade_id": trade_id,
+                "trade_info": trade_info,
+                "sim_pnl_pct": pnl_pct,
+                "sim_won": won,
+            })
 
-            # Atualiza alocacao
-            alloc["pnl"] = round(real_pnl, 4)
-            alloc["trades"] = sim_trades
-            alloc["last_synced_trades"] = sim_trades
-            alloc["sim_pnl_pct"] = round(sim_pnl_pct, 2)
-            alloc["last_sync"] = time.time()
-            if last_trade_info:
-                alloc["last_trade_info"] = last_trade_info
+            logger.info(
+                f"[MODO REAL] Sinal detectado: {key} {direction} "
+                f"${alloc['amount']:.2f} {coin} | Sim: {pnl_pct:+.1f}%"
+            )
 
-            self._save_allocations()
+        return signals
 
-            for _ in range(new_trades):
-                replicated.append({
-                    "strategy": key,
-                    "coin": alloc.get("coin", "SOL"),
-                    "amount": real_amount,
-                    "sim_pnl_pct": sim_pnl_pct,
-                    "real_pnl": real_pnl,
-                    "trades": sim_trades,
-                    "last_info": last_trade_info,
-                })
+    def update_allocation_after_trade(self, key: str, tx_hash: str, pnl_usd: float):
+        """Atualiza dados da alocacao apos executar trade real."""
+        if key not in self.allocations:
+            return
+        alloc = self.allocations[key]
+        alloc["trades"] = alloc.get("trades", 0) + 1
+        alloc["pnl"] = round(alloc.get("pnl", 0) + pnl_usd, 4)
+        alloc["last_tx"] = tx_hash
+        alloc["last_trade_time"] = time.time()
 
-            if new_trades > 0:
-                logger.info(
-                    f"[MODO REAL] {key}: {new_trades} novos trades | "
-                    f"Sim PNL: {sim_pnl_pct:+.2f}% | "
-                    f"Real PNL: ${real_pnl:+.2f} (de ${real_amount:.2f})"
-                )
+        # Pega info do ultimo trade
+        trade_info = self._get_last_trade_info(key, getattr(self, key).get_dashboard_data())
+        if trade_info:
+            alloc["last_trade_info"] = trade_info
+            alloc["sim_pnl_pct"] = trade_info.get("pnl_pct", 0)
 
-        return replicated
+        self._save_allocations()
 
     def _get_last_trade_info(self, key: str, data: Dict) -> Optional[Dict]:
         """Extrai info do ultimo trade da simulacao para mostrar no dashboard."""

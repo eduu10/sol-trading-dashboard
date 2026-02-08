@@ -738,39 +738,132 @@ class TelegramBot:
             else:
                 await self.send_message("❌ Erro ao executar trade. Verifique os logs.")
 
+        # Snapshot trade counts ANTES da simulacao
+        before_counts = self.strategies.snapshot_trade_counts()
+
         # Roda simulacao das 5 estrategias de teste
         try:
             await self.strategies.run_simulation_cycle()
         except Exception as e:
             logger.debug(f"Strategies simulation error: {e}")
 
-        # Sincroniza MODO REAL com simulacoes (replica PNL proporcional)
+        # MODO REAL: detecta novos trades e executa swaps reais via Jupiter
         try:
-            replicated = self.strategies.sync_real_from_simulations()
-            for trade in replicated:
-                strat_key = trade["strategy"]
-                coin = trade["coin"]
-                amount = trade["amount"]
-                real_pnl = trade["real_pnl"]
-                sim_pnl_pct = trade["sim_pnl_pct"]
-                info = trade.get("last_info", {})
-                info_str = ""
-                if info:
-                    info_str = f"\nUltimo: {info.get('status', '?')} | PNL sim: {info.get('pnl_pct', 0):+.1f}%"
+            signals = self.strategies.get_new_trade_signals(before_counts)
+            for sig in signals:
+                strat_key = sig["strategy"]
+                coin = sig["coin"]
+                amount_usd = sig["amount_usd"]
+                direction = sig["direction"]
+                sim_pnl_pct = sig["sim_pnl_pct"]
+                trade_id = sig["trade_id"]
 
                 logger.info(
-                    f"[MODO REAL] {strat_key}: trade #{trade['trades']} | "
-                    f"${amount:.2f} {coin} | PNL: ${real_pnl:+.2f} ({sim_pnl_pct:+.1f}%)"
+                    f"[MODO REAL] Executando trade real: {strat_key} "
+                    f"${amount_usd:.2f} {coin} | dir={direction}"
                 )
+
+                # Resolve mint addresses
+                coin_mint = config.TOKENS.get(coin, config.TOKENS["SOL"])
+                usdc_mint = config.TOKENS["USDC"]
+
+                # Decimals: USDC=6, SOL=9, outros=variavel
+                decimals = {"SOL": 9, "USDC": 6, "USDT": 6, "WBTC": 8, "JUP": 6, "BONK": 5}
+                coin_decimals = decimals.get(coin, 9)
+
+                real_pnl = 0.0
+                tx_buy = None
+                tx_sell = None
+
+                try:
+                    # === PASSO 1: Compra (USDC -> Coin) ===
+                    buy_amount_lamports = int(amount_usd * (10 ** 6))  # USDC has 6 decimals
+                    buy_quote = await self.executor.get_quote(
+                        usdc_mint, coin_mint, buy_amount_lamports
+                    )
+                    if not buy_quote:
+                        logger.warning(f"[MODO REAL] {strat_key}: sem quote para compra")
+                        continue
+
+                    tx_buy = await self.executor.execute_swap(buy_quote)
+                    if not tx_buy:
+                        logger.warning(f"[MODO REAL] {strat_key}: falha na compra")
+                        continue
+
+                    coins_received = int(buy_quote.get("outAmount", 0))
+                    logger.info(
+                        f"[MODO REAL] {strat_key}: COMPROU {coins_received} {coin} "
+                        f"(${amount_usd:.2f} USDC) | TX: {tx_buy}"
+                    )
+
+                    # === PASSO 2: Vende imediatamente (Coin -> USDC) ===
+                    sell_quote = await self.executor.get_quote(
+                        coin_mint, usdc_mint, coins_received
+                    )
+                    if not sell_quote:
+                        logger.warning(
+                            f"[MODO REAL] {strat_key}: sem quote para venda! "
+                            f"Posicao aberta: {coins_received} {coin}"
+                        )
+                        # Registra trade parcial (so compra)
+                        self.strategies.update_allocation_after_trade(
+                            strat_key, tx_buy, 0.0
+                        )
+                        self.strategies.mark_trade_executed(strat_key, trade_id, tx_buy)
+                        continue
+
+                    tx_sell = await self.executor.execute_swap(sell_quote)
+                    if not tx_sell:
+                        logger.warning(
+                            f"[MODO REAL] {strat_key}: falha na venda! "
+                            f"Posicao aberta: {coins_received} {coin}"
+                        )
+                        self.strategies.update_allocation_after_trade(
+                            strat_key, tx_buy, 0.0
+                        )
+                        self.strategies.mark_trade_executed(strat_key, trade_id, tx_buy)
+                        continue
+
+                    usdc_received = int(sell_quote.get("outAmount", 0)) / (10 ** 6)
+                    real_pnl = round(usdc_received - amount_usd, 4)
+
+                    logger.info(
+                        f"[MODO REAL] {strat_key}: VENDEU → ${usdc_received:.4f} USDC | "
+                        f"PNL: ${real_pnl:+.4f} | TX: {tx_sell}"
+                    )
+
+                except Exception as ex:
+                    logger.error(f"[MODO REAL] {strat_key}: erro no swap: {ex}")
+                    if tx_buy:
+                        self.strategies.update_allocation_after_trade(
+                            strat_key, tx_buy, 0.0
+                        )
+                    continue
+
+                # Atualiza alocacao com resultado real
+                final_tx = tx_sell or tx_buy or "ERROR"
+                self.strategies.update_allocation_after_trade(
+                    strat_key, final_tx, real_pnl
+                )
+                self.strategies.mark_trade_executed(strat_key, trade_id, final_tx)
+
+                # Notificacao Telegram
+                trade_num = self.strategies.allocations.get(strat_key, {}).get("trades", 0)
+                pnl_emoji = "🟢" if real_pnl >= 0 else "🔴"
                 await self.send_message(
-                    f"📊 *MODO REAL* - {strat_key}\n"
-                    f"Trade #{trade['trades']} replicado\n"
-                    f"Capital: ${amount:.2f} {coin}\n"
-                    f"PNL Real: ${real_pnl:+.2f} ({sim_pnl_pct:+.1f}%)"
-                    f"{info_str}"
+                    f"💰 *MODO REAL* - {strat_key}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"Trade #{trade_num} executado!\n"
+                    f"📦 Capital: ${amount_usd:.2f} {coin}\n"
+                    f"{pnl_emoji} PNL Real: ${real_pnl:+.4f}\n"
+                    f"📊 PNL Sim: {sim_pnl_pct:+.1f}%\n"
+                    f"🔗 Buy TX: `{tx_buy}`\n"
+                    f"🔗 Sell TX: `{tx_sell}`\n"
+                    f"━━━━━━━━━━━━━━━━━━━━"
                 )
+
         except Exception as e:
-            logger.debug(f"Real sync error: {e}")
+            logger.debug(f"Real trade execution error: {e}")
 
         # Atualiza saldo da carteira Phantom (read-only)
         wallet_data = {}

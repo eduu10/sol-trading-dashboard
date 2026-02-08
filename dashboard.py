@@ -1379,12 +1379,21 @@ function renderRealModeSection(){
         const a=activeAllocations[k];
         const pnl=a.pnl||0;
         const simPct=a.sim_pnl_pct||0;
+        const trades=a.trades||0;
         const pnlCls=pnl>0?'profit':pnl<0?'loss':'neutral';
         const pnlColor=pnl>0?'var(--green)':pnl<0?'var(--red)':'var(--text-muted)';
         const pctColor=simPct>0?'var(--green)':simPct<0?'var(--red)':'var(--text-muted)';
+        const lastTx=a.last_tx||'';
+        const shortTx=lastTx?lastTx.substring(0,12)+'...':'Nenhum';
+        const txLink=lastTx&&!lastTx.startsWith('PAPER')?`https://solscan.io/tx/${lastTx}`:'';
         const info=a.last_trade_info;
         let infoHtml='';
-        if(info){const ip=info.pnl_pct||0;infoHtml=`<div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Ultimo Trade</span><span class="strat-cap-value" style="color:${ip>=0?'var(--green)':'var(--red)'}">${info.name||info.token||'?'} ${info.status||'?'} ${ip>=0?'+':''}${ip.toFixed(1)}%</span></div>`;}
+        if(info){const ip=info.pnl_pct||0;infoHtml=`<div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Ultimo Sinal</span><span class="strat-cap-value" style="color:${ip>=0?'var(--green)':'var(--red)'}">${info.name||info.token||'?'} ${info.status||'?'} ${ip>=0?'+':''}${ip.toFixed(1)}%</span></div>`;}
+        let txHtml='';
+        if(lastTx){
+            if(txLink){txHtml=`<div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Ultima TX</span><span class="strat-cap-value"><a href="${txLink}" target="_blank" style="color:var(--purple);text-decoration:underline;">${shortTx}</a></span></div>`;}
+            else{txHtml=`<div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Ultima TX</span><span class="strat-cap-value" style="color:var(--text-muted)">${shortTx}</span></div>`;}
+        }
         html+=`<div class="strat-card real-mode ${riskMap[k]||''}" id="real-${k}">
             <div class="strat-header">
                 <div class="strat-name">${nameMap[k]||k}</div>
@@ -1393,19 +1402,20 @@ function renderRealModeSection(){
             <div class="strat-badges">
                 <span class="real-coin-badge">${a.coin||'SOL'}</span>
                 <span class="strat-badge return-badge">$${a.amount.toFixed(2)}</span>
-                <span class="strat-badge time-badge">${a.trades||0} trades</span>
+                <span class="strat-badge time-badge">${trades} trade${trades!==1?'s':''}</span>
             </div>
-            <div class="strat-pnl ${pnlCls}" id="real-${k}-pnl">${pnl>=0?'+$':'-$'}${Math.abs(pnl).toFixed(2)}</div>
+            <div class="strat-pnl ${pnlCls}" id="real-${k}-pnl">${pnl>=0?'+$':'-$'}${Math.abs(pnl).toFixed(4)}</div>
             <div class="strat-capital">
                 <div class="strat-cap-item"><span class="strat-cap-label">Alocado</span><span class="strat-cap-value" style="color:var(--yellow)">$${a.amount.toFixed(2)}</span></div>
                 <div class="strat-cap-item"><span class="strat-cap-label">Moeda</span><span class="strat-cap-value" style="color:var(--purple)">${a.coin||'SOL'}</span></div>
                 <div class="strat-cap-item"><span class="strat-cap-label">Sim %</span><span class="strat-cap-value" style="color:${pctColor}">${simPct>=0?'+':''}${simPct.toFixed(1)}%</span></div>
-                <div class="strat-cap-item"><span class="strat-cap-label">P&L Real</span><span class="strat-cap-value" style="color:${pnlColor}">${pnl>=0?'+$':'-$'}${Math.abs(pnl).toFixed(2)}</span></div>
+                <div class="strat-cap-item"><span class="strat-cap-label">P&L Real</span><span class="strat-cap-value" style="color:${pnlColor}">${pnl>=0?'+$':'-$'}${Math.abs(pnl).toFixed(4)}</span></div>
                 ${infoHtml}
+                ${txHtml}
             </div>
             <div class="strat-stats">
                 <div class="strat-stat-row"><span class="strat-stat-label">Status</span><span class="strat-stat-value" style="color:var(--green)">ATIVO</span></div>
-                <div class="strat-stat-row"><span class="strat-stat-label">Trades Replicados</span><span class="strat-stat-value">${a.trades||0}</span></div>
+                <div class="strat-stat-row"><span class="strat-stat-label">Trades Executados</span><span class="strat-stat-value">${trades}</span></div>
             </div>
             <button class="alloc-stop-btn" style="width:100%;margin-top:12px;justify-content:center;" onclick="deallocateStrategy('${k}')">
                 <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> Parar Modo Real
