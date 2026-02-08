@@ -199,23 +199,25 @@ class JupiterExecutor:
             raw_tx = base64.b64decode(swap_transaction)
             tx = VersionedTransaction.from_bytes(raw_tx)
 
-            # Sign
+            # Sign (solders 0.27+: sign message then populate)
             keypair = Keypair.from_base58_string(config.SOLANA_PRIVATE_KEY)
-            tx.sign([keypair], tx.message.recent_blockhash)
+            msg_bytes = bytes(tx.message)
+            signature = keypair.sign_message(msg_bytes)
+            signed_tx = VersionedTransaction.populate(tx.message, [signature])
 
             # Send
             client = SolanaClient(config.SOLANA_RPC_URL)
-            result = await client.send_transaction(tx)
+            result = await client.send_transaction(signed_tx)
             await client.close()
 
             return str(result.value)
 
         except ImportError:
             logger.error("Instale: pip install solana solders")
-            return "ERROR_NO_SOLANA_SDK"
+            return None
         except Exception as e:
             logger.error(f"Sign/Send error: {e}")
-            return f"ERROR_{e}"
+            return None
 
     # --------------------------------------------------------
     # TRADE COMPLETO
