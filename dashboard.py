@@ -649,6 +649,13 @@ DASHBOARD_HTML = r"""
         .strat-card.is-paused .strat-pnl { color: var(--text-muted) !important; }
         .strat-paused-badge { display: none; font-size: 0.6em; color: var(--red); background: rgba(255,68,102,0.1); border: 1px solid rgba(255,68,102,0.2); padding: 2px 8px; border-radius: 4px; font-weight: 600; letter-spacing: 0.5px; margin-left: auto; }
         .strat-card.is-paused .strat-paused-badge { display: inline-block; }
+        .strat-card.real-mode { border-color: rgba(0,255,136,0.2); }
+        .strat-card.real-mode::before { background: linear-gradient(90deg, var(--green), var(--blue)) !important; }
+        .real-mode-badge { font-size: 0.6em; color: var(--green); background: rgba(0,255,136,0.1); border: 1px solid rgba(0,255,136,0.2); padding: 2px 8px; border-radius: 4px; font-weight: 600; letter-spacing: 0.5px; }
+        .real-coin-badge { font-size: 0.6em; color: var(--yellow); background: rgba(255,170,0,0.1); border: 1px solid rgba(255,170,0,0.2); padding: 2px 8px; border-radius: 4px; font-weight: 600; letter-spacing: 0.5px; }
+        .real-pnl-row { display: flex; justify-content: space-between; align-items: center; margin: 6px 0; }
+        .real-pnl-label { font-size: 0.7em; color: var(--text-muted); }
+        .real-pnl-value { font-family: 'JetBrains Mono', monospace; font-size: 0.85em; font-weight: 700; }
         .strat-recent-title { font-size: 0.65em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
         .strat-recent-item { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; font-size: 0.72em; font-family: 'JetBrains Mono', monospace; }
         .strat-recent-name { color: var(--text-secondary); }
@@ -985,6 +992,17 @@ DASHBOARD_HTML = r"""
             </div>
         </div>
 
+        <!-- ===== MODO REAL ===== -->
+        <div class="strategies-section" id="real-mode-section" style="display:none">
+            <div class="strategies-title-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--green)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                <span class="strategies-title">Estrategias de Day Trade</span>
+                <span class="strategies-subtitle" style="background:rgba(0,255,136,0.08);border-color:rgba(0,255,136,0.15);color:var(--green)">MODO REAL</span>
+            </div>
+            <div class="strategies-grid" id="real-strategies-grid">
+            </div>
+        </div>
+
         <!-- Row 4: Log -->
         <div class="card log-card">
             <div class="card-label">
@@ -1082,7 +1100,7 @@ async function pollData() {
 // UPDATE DASHBOARD
 // ============================================================
 function updateDashboard(data) {
-    if (data.error) return;
+    if (!data || data.error) return;
 
     // Price
     const price = data.price || 0;
@@ -1255,7 +1273,8 @@ function updateDashboard(data) {
 // STRATEGY PANELS UPDATE
 // ============================================================
 function updateStrategies(strats){
-    function setCap(prefix,cap){if(!cap)return;setText(prefix+'-cap','$'+cap.current.toFixed(2));setText(prefix+'-inv','$'+cap.total_invested.toFixed(2));setText(prefix+'-gain','$'+cap.total_gains.toFixed(2));setText(prefix+'-loss','$'+cap.total_losses.toFixed(2));var te=document.getElementById(prefix+'-today');if(te){te.textContent=(cap.today_pnl>=0?'+$':'-$')+Math.abs(cap.today_pnl).toFixed(2);te.style.color=cap.today_pnl>=0?'var(--green)':'var(--red)';}}
+    if(!strats)return;
+    function setCap(prefix,cap){if(!cap)return;setText(prefix+'-cap','$'+(cap.current||0).toFixed(2));setText(prefix+'-inv','$'+(cap.total_invested||0).toFixed(2));setText(prefix+'-gain','$'+(cap.total_gains||0).toFixed(2));setText(prefix+'-loss','$'+(cap.total_losses||0).toFixed(2));var te=document.getElementById(prefix+'-today');if(te){var tp=cap.today_pnl||0;te.textContent=(tp>=0?'+$':'-$')+Math.abs(tp).toFixed(2);te.style.color=tp>=0?'var(--green)':'var(--red)';}}
     function setPaused(cardId,btnId,paused){const card=document.getElementById(cardId);const btn=document.getElementById(btnId);if(card){if(paused){card.classList.add('is-paused');}else{card.classList.remove('is-paused');}}if(btn){btn.textContent=paused?'Continuar':'Parar';btn.className='strat-toggle-btn '+(paused?'paused':'running');}}
     if(strats.sniper){const s=strats.sniper.stats||{},c=strats.sniper.capital||{};setPnl('strat-sniper-pnl',c.pnl_usd||0,false);setCap('strat-sniper',c);setText('strat-sniper-trades',s.total_snipes||0);setText('strat-sniper-wr',(s.win_rate||0).toFixed(0)+'%');setBar('strat-sniper-wrbar',s.win_rate||0);setText('strat-sniper-rug',s.rugged||0);setRecent('strat-sniper-recent',(strats.sniper.recent_targets||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.name}</span><span class="strat-recent-pnl" style="color:${t.pnl_pct>=0?'var(--green)':'var(--red)'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</span></div>`);}
     if(strats.memecoin){const s=strats.memecoin.stats||{},c=strats.memecoin.capital||{};setPnl('strat-meme-pnl',c.pnl_usd||0,false);setCap('strat-meme',c);setText('strat-meme-trades',s.total_trades||0);setText('strat-meme-wr',(s.win_rate||0).toFixed(0)+'%');setBar('strat-meme-wrbar',s.win_rate||0);setText('strat-meme-momentum',s.high_momentum_count||0);setRecent('strat-meme-recent',(strats.memecoin.recent_signals||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.name}</span><span class="strat-recent-pnl" style="color:${t.pnl_pct>=0?'var(--green)':'var(--red)'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</span></div>`);}
@@ -1341,9 +1360,53 @@ function updateAllocationsFromData(allocData){
     if(!allocData)return;
     activeAllocations={};
     for(const[k,v]of Object.entries(allocData)){
-        if(v.active)activeAllocations[k]={amount:v.amount,coin:v.coin||'SOL',status:'active'};
+        if(v.active)activeAllocations[k]={amount:v.amount,coin:v.coin||'SOL',status:'active',pnl:v.pnl||0,trades:v.trades||0,last_tx:v.last_tx||''};
     }
     renderAllocations();
+    renderRealModeSection();
+}
+function renderRealModeSection(){
+    const section=document.getElementById('real-mode-section');
+    const grid=document.getElementById('real-strategies-grid');
+    if(!section||!grid)return;
+    const keys=Object.keys(activeAllocations);
+    if(keys.length===0){section.style.display='none';return;}
+    section.style.display='';
+    const nameMap={sniper:'Sniping Pump.fun',memecoin:'Meme Coins',arbitrage:'Arbitragem DEX',scalping:'Scalping Tokens',leverage:'Leverage Trading'};
+    const riskMap={sniper:'risk-alto',memecoin:'risk-alto',arbitrage:'risk-medio',scalping:'risk-medio-baixo',leverage:'risk-muito-alto'};
+    let html='';
+    for(const k of keys){
+        const a=activeAllocations[k];
+        const pnl=a.pnl||0;
+        const pnlCls=pnl>0?'profit':pnl<0?'loss':'neutral';
+        const pnlColor=pnl>0?'var(--green)':pnl<0?'var(--red)':'var(--text-muted)';
+        html+=`<div class="strat-card real-mode ${riskMap[k]||''}" id="real-${k}">
+            <div class="strat-header">
+                <div class="strat-name">${nameMap[k]||k}</div>
+                <span class="real-mode-badge">REAL</span>
+            </div>
+            <div class="strat-badges">
+                <span class="real-coin-badge">${a.coin||'SOL'}</span>
+                <span class="strat-badge return-badge">$${a.amount.toFixed(2)}</span>
+            </div>
+            <div class="strat-pnl ${pnlCls}" id="real-${k}-pnl">${pnl>=0?'+$':'-$'}${Math.abs(pnl).toFixed(2)}</div>
+            <div class="strat-capital">
+                <div class="strat-cap-item"><span class="strat-cap-label">Alocado</span><span class="strat-cap-value" style="color:var(--yellow)">$${a.amount.toFixed(2)}</span></div>
+                <div class="strat-cap-item"><span class="strat-cap-label">Moeda</span><span class="strat-cap-value" style="color:var(--purple)">${a.coin||'SOL'}</span></div>
+                <div class="strat-cap-item"><span class="strat-cap-label">Trades</span><span class="strat-cap-value">${a.trades||0}</span></div>
+                <div class="strat-cap-item"><span class="strat-cap-label">P&L</span><span class="strat-cap-value" style="color:${pnlColor}">${pnl>=0?'+$':'-$'}${Math.abs(pnl).toFixed(2)}</span></div>
+                ${a.last_tx?`<div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Ultima TX</span><span class="strat-cap-value" style="color:var(--blue)">${a.last_tx.substring(0,16)}...</span></div>`:''}
+            </div>
+            <div class="strat-stats">
+                <div class="strat-stat-row"><span class="strat-stat-label">Status</span><span class="strat-stat-value" style="color:var(--green)">ATIVO</span></div>
+                <div class="strat-stat-row"><span class="strat-stat-label">Trades Reais</span><span class="strat-stat-value" id="real-${k}-trades">${a.trades||0}</span></div>
+            </div>
+            <button class="alloc-stop-btn" style="width:100%;margin-top:12px;justify-content:center;" onclick="deallocateStrategy('${k}')">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> Parar Modo Real
+            </button>
+        </div>`;
+    }
+    grid.innerHTML=html;
 }
 // Tooltip positioning - move to body so overflow:hidden won't clip
 (function(){
