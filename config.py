@@ -119,9 +119,9 @@ MIN_RISK_REWARD = 1.2              # R:R mínimo 1.2:1 (era 1.5 - muito restriti
 # ============================================================
 # JUPITER DEX
 # ============================================================
-JUPITER_API_URL = "https://quote-api.jup.ag/v6"
-JUPITER_SWAP_URL = "https://quote-api.jup.ag/v6/swap"
-JUPITER_PRICE_URL = "https://price.jup.ag/v6/price"
+JUPITER_API_URL = "https://lite-api.jup.ag/swap/v1"
+JUPITER_SWAP_URL = "https://lite-api.jup.ag/swap/v1/swap"
+JUPITER_PRICE_URL = "https://lite-api.jup.ag/swap/v1/price"
 
 # ============================================================
 # DADOS DE PREÇO - GeckoTerminal (grátis, sem API key!)
