@@ -417,12 +417,8 @@ class TelegramBot:
             logger.warning("Timeframes insuficientes para confluência")
             return
 
-        # 3. Gera sinal de confluência
-        signal = self.confluence.generate_signal(
-            f"{config.TRADE_TOKEN}/{config.BASE_TOKEN}",
-            scores_by_tf,
-            data["execution"]
-        )
+        # 3. Calcula confluência (sempre, para mostrar análise)
+        conf = self.confluence.calculate_confluence(scores_by_tf)
 
         # 4. Preço atual (usa último candle se possível, senão busca)
         current_price = float(data["execution"].iloc[-1]["close"]) if not data["execution"].empty else 0.0
@@ -430,7 +426,61 @@ class TelegramBot:
             current_price = await self.price_fetcher.get_current_price()
         self.last_price = current_price
 
-        # 5. Verifica posições existentes (SL/TP)
+        # 5. Monta relatório de análise (sempre mostra)
+        direction_emoji = "🟢" if conf["direction"] == "long" else "🔴"
+        confidence_pct = conf["confidence"] * 100
+        agreeing = conf["agreeing_indicators"]
+        total_ind = len(conf["combined_scores"])
+
+        # Barra de confiança visual
+        bar_filled = int(confidence_pct / 10)
+        bar_empty = 10 - bar_filled
+        bar = "█" * bar_filled + "░" * bar_empty
+
+        # Indicadores individuais
+        ind_lines = []
+        for ind_name, score in sorted(conf["combined_scores"].items(), key=lambda x: abs(x[1]), reverse=True):
+            if score > 0.1:
+                ind_lines.append(f"  🟢 {ind_name}: +{score:.2f}")
+            elif score < -0.1:
+                ind_lines.append(f"  🔴 {ind_name}: {score:.2f}")
+            else:
+                ind_lines.append(f"  ⚪ {ind_name}: {score:.2f}")
+        ind_text = "\n".join(ind_lines)
+
+        # RSI e Volume detalhados
+        exec_scores = scores_by_tf.get("execution", {})
+        rsi_val = exec_scores.get("rsi", {}).get("value", 50)
+        vol_ratio = exec_scores.get("volume", {}).get("ratio", 1.0)
+        rsi_emoji = "🟢" if 30 < rsi_val < 70 else "🔴"
+        vol_emoji = "🟢" if vol_ratio > 0.8 else "🔴"
+
+        analysis_msg = (
+            f"📊 *ANÁLISE #{self.analysis_count}*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💲 {config.TRADE_TOKEN}: *${current_price:,.2f}*\n"
+            f"{direction_emoji} Direção: *{conf['direction'].upper()}*\n"
+            f"📈 Confiança: *{confidence_pct:.1f}%* [{bar}]\n"
+            f"🎯 Indicadores: {agreeing}/{total_ind} concordam\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"{rsi_emoji} RSI: {rsi_val:.1f}\n"
+            f"{vol_emoji} Volume: {vol_ratio:.2f}x\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"{ind_text}\n"
+        )
+
+        # Envia análise a cada 5 ciclos (para não spammar)
+        if self.analysis_count % 5 == 0:
+            await self.send_message(analysis_msg)
+
+        logger.info(
+            f"📊 Análise #{self.analysis_count} | "
+            f"${current_price:,.2f} | "
+            f"{conf['direction'].upper()} {confidence_pct:.0f}% | "
+            f"{agreeing}/{total_ind} ind"
+        )
+
+        # 6. Verifica posições existentes (SL/TP)
         events = await self.executor.check_positions(current_price)
         for event in events:
             pos = event["position"]
@@ -441,35 +491,51 @@ class TelegramBot:
                 f"TX: `{event.get('tx', 'N/A')}`"
             )
 
-        # 6. Executa novo trade se houver sinal
+        # 7. Gera sinal completo e executa trade
+        signal = self.confluence.generate_signal(
+            f"{config.TRADE_TOKEN}/{config.BASE_TOKEN}",
+            scores_by_tf,
+            data["execution"]
+        )
+
         if signal and self.auto_trading:
             self.last_signal = signal
-            logger.info(
-                f"🚨 Sinal detectado: {signal.direction.upper()} "
-                f"confiança={signal.confidence:.0%}"
+
+            # ENTRADA DETECTADA - mensagem com ênfase!
+            entry_msg = (
+                f"🚨🚨🚨 *ENTRADA DETECTADA!* 🚨🚨🚨\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"{'🟢 COMPRA (LONG)' if signal.direction == 'long' else '🔴 VENDA (SHORT)'}\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"💰 *Entrada:* ${signal.entry_price:,.2f}\n"
+                f"🛑 *Stop Loss:* ${signal.stop_loss:,.2f}\n"
+            )
+            for i, tp in enumerate(signal.take_profits):
+                entry_msg += f"🎯 *TP{i+1}:* ${tp:,.2f}\n"
+            entry_msg += (
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"📈 Confiança: *{signal.confidence:.0%}*\n"
+                f"⚖️ Risco/Retorno: *{signal.risk_reward_ratio:.1f}:1*\n"
+                f"🔗 DEX: Jupiter (Solana)\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
             )
 
-            # Alerta no Telegram
-            await self.send_message(signal.telegram_message())
+            await self.send_message(entry_msg)
 
-            # Executa
+            # Executa o trade
             position = await self.executor.open_position(signal, current_price)
             if position:
                 await self.send_message(
-                    f"✅ *Trade Executado!*\n"
-                    f"📦 {position.quantity:.8f} {config.TRADE_TOKEN}\n"
+                    f"✅✅✅ *TRADE EXECUTADO!* ✅✅✅\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📦 Quantidade: {position.quantity:.8f} {config.TRADE_TOKEN}\n"
                     f"💵 Investido: ${position.quantity_base:,.2f}\n"
-                    f"🔗 TX: `{position.tx_hash}`"
+                    f"💰 Entrada: ${current_price:,.2f}\n"
+                    f"🔗 TX: `{position.tx_hash}`\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
                 )
-
-        # Log periódico
-        if self.analysis_count % 10 == 0:
-            n_pos = len(self.executor.positions)
-            logger.info(
-                f"📊 Análise #{self.analysis_count} | "
-                f"Preço: ${current_price:,.2f} | "
-                f"Posições: {n_pos}"
-            )
+            else:
+                await self.send_message("❌ Erro ao executar trade. Verifique os logs.")
 
         # Push para dashboard na nuvem
         try:
@@ -495,6 +561,12 @@ class TelegramBot:
                 "positions": dashboard.get("positions", []),
                 "indicators": self.last_indicators,
                 "last_signal": last_signal,
+                "confluence": {
+                    "direction": conf["direction"],
+                    "confidence": round(conf["confidence"] * 100, 1),
+                    "agreeing": conf["agreeing_indicators"],
+                    "scores": {k: round(v, 3) for k, v in conf["combined_scores"].items()},
+                },
                 "logs": self.dashboard.logs[-30:],
             }
             await push_to_cloud(cloud_data)
