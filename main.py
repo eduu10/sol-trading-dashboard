@@ -926,6 +926,7 @@ class TelegramBot:
                 "strategies": self.strategies.get_all_dashboard_data(),
                 "wallet": wallet_data,
                 "allocations": self.strategies.get_all_allocations(),
+                "pk_mask": (config.SOLANA_PRIVATE_KEY[:4] + "..." + config.SOLANA_PRIVATE_KEY[-4:]) if len(config.SOLANA_PRIVATE_KEY) > 8 else "",
             }
             commands = await push_to_cloud(cloud_data)
             # Processa comandos do dashboard na nuvem
@@ -944,8 +945,61 @@ class TelegramBot:
                     key = cmd.get("strategy", "")
                     if self.strategies.deallocate_strategy(key):
                         logger.info(f"Desalocacao: {key}")
+                elif action == "save_settings":
+                    self._apply_settings(cmd)
         except Exception as e:
             logger.debug(f"Cloud push prep error: {e}")
+
+    # --------------------------------------------------------
+    # CONFIGURACOES VIA DASHBOARD
+    # --------------------------------------------------------
+    def _apply_settings(self, cmd: dict):
+        """Aplica configuracoes recebidas do dashboard (private key, paper mode)."""
+        import re
+        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.py")
+        changed = []
+
+        pk = cmd.get("private_key")
+        if pk and isinstance(pk, str) and len(pk) > 10:
+            config.SOLANA_PRIVATE_KEY = pk
+            changed.append("SOLANA_PRIVATE_KEY")
+
+        paper = cmd.get("paper_trading")
+        if paper is not None:
+            config.PAPER_TRADING = bool(paper)
+            changed.append("PAPER_TRADING")
+
+        if not changed:
+            return
+
+        # Persiste no config.py em disco
+        try:
+            with open(config_path, "r") as f:
+                content = f.read()
+
+            if "SOLANA_PRIVATE_KEY" in changed:
+                content = re.sub(
+                    r'SOLANA_PRIVATE_KEY\s*=\s*"[^"]*"',
+                    f'SOLANA_PRIVATE_KEY = "{config.SOLANA_PRIVATE_KEY}"',
+                    content
+                )
+            if "PAPER_TRADING" in changed:
+                content = re.sub(
+                    r'PAPER_TRADING\s*=\s*(True|False)',
+                    f'PAPER_TRADING = {config.PAPER_TRADING}',
+                    content
+                )
+
+            with open(config_path, "w") as f:
+                f.write(content)
+
+            mask = config.SOLANA_PRIVATE_KEY[:4] + "..." + config.SOLANA_PRIVATE_KEY[-4:] if len(config.SOLANA_PRIVATE_KEY) > 8 else "(vazia)"
+            logger.info(
+                f"[SETTINGS] Configuracoes atualizadas: {', '.join(changed)} | "
+                f"PK={mask} | PAPER={config.PAPER_TRADING}"
+            )
+        except Exception as e:
+            logger.error(f"[SETTINGS] Erro ao salvar config.py: {e}")
 
     # --------------------------------------------------------
     # AUTO-RETIRADA DE LUCRO

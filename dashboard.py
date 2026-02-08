@@ -139,6 +139,99 @@ DASHBOARD_HTML = r"""
         }
         .mode-paper { background: var(--yellow-dark); color: var(--yellow); border: 1px solid rgba(255,170,0,0.2); }
         .mode-live { background: var(--red-dark); color: var(--red); border: 1px solid rgba(255,68,102,0.2); }
+        .settings-btn {
+            background: none; border: none; cursor: pointer; padding: 6px;
+            color: var(--text-secondary); transition: color 0.2s, transform 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .settings-btn:hover { color: var(--text-primary); transform: rotate(45deg); }
+        .settings-btn svg { width: 20px; height: 20px; }
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+            z-index: 9999; align-items: center; justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-box {
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            border-radius: 16px; padding: 32px; width: 440px; max-width: 95vw;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .modal-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);
+        }
+        .modal-header h2 {
+            font-size: 1.2em; font-weight: 700; display: flex; align-items: center; gap: 10px;
+        }
+        .modal-header h2 svg { width: 22px; height: 22px; color: var(--purple); }
+        .modal-close {
+            background: none; border: none; cursor: pointer; color: var(--text-muted);
+            font-size: 1.5em; line-height: 1; padding: 4px 8px; border-radius: 8px;
+            transition: background 0.2s, color 0.2s;
+        }
+        .modal-close:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
+        .setting-group { margin-bottom: 20px; }
+        .setting-label {
+            font-size: 0.8em; font-weight: 600; color: var(--text-secondary);
+            text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+        }
+        .setting-desc { font-size: 0.75em; color: var(--text-muted); margin-bottom: 8px; }
+        .setting-input-wrap {
+            position: relative; display: flex; align-items: center;
+        }
+        .setting-input-wrap input {
+            width: 100%; background: var(--bg-secondary); border: 1px solid var(--border-color);
+            border-radius: 10px; padding: 12px 44px 12px 14px; color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace; font-size: 0.85em;
+            transition: border-color 0.2s;
+        }
+        .setting-input-wrap input:focus { outline: none; border-color: var(--purple); }
+        .setting-input-wrap input::placeholder { color: var(--text-muted); }
+        .toggle-pw-btn {
+            position: absolute; right: 8px; background: none; border: none;
+            cursor: pointer; color: var(--text-muted); padding: 6px;
+            transition: color 0.2s;
+        }
+        .toggle-pw-btn:hover { color: var(--text-primary); }
+        .toggle-pw-btn svg { width: 18px; height: 18px; }
+        .setting-toggle {
+            display: flex; align-items: center; justify-content: space-between;
+            background: var(--bg-secondary); border: 1px solid var(--border-color);
+            border-radius: 10px; padding: 14px;
+        }
+        .setting-toggle-label { font-size: 0.9em; font-weight: 500; }
+        .setting-toggle-sub { font-size: 0.7em; color: var(--text-muted); margin-top: 2px; }
+        .switch {
+            position: relative; width: 48px; height: 26px; flex-shrink: 0;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch-slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--text-muted); border-radius: 26px; transition: 0.3s;
+        }
+        .switch-slider:before {
+            content: ''; position: absolute; height: 20px; width: 20px;
+            left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s;
+        }
+        .switch input:checked + .switch-slider { background: var(--green); }
+        .switch input:checked + .switch-slider:before { transform: translateX(22px); }
+        .modal-save-btn {
+            width: 100%; padding: 14px; border: none; border-radius: 10px;
+            background: linear-gradient(135deg, var(--purple), var(--blue));
+            color: white; font-size: 0.95em; font-weight: 600; cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s; margin-top: 8px;
+        }
+        .modal-save-btn:hover { opacity: 0.9; }
+        .modal-save-btn:active { transform: scale(0.98); }
+        .modal-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .setting-status {
+            text-align: center; font-size: 0.8em; margin-top: 12px;
+            padding: 8px; border-radius: 8px; display: none;
+        }
+        .setting-status.success { display: block; color: var(--green); background: var(--green-dark); }
+        .setting-status.error { display: block; color: var(--red); background: var(--red-dark); }
+        .key-mask { color: var(--text-muted); font-style: italic; font-size: 0.8em; }
 
         /* ===== MAIN GRID ===== */
         .main {
@@ -728,6 +821,9 @@ DASHBOARD_HTML = r"""
                 <div class="status-dot" id="ws-dot"></div>
                 <span id="ws-status">Conectando...</span>
             </div>
+            <button class="settings-btn" onclick="openSettings()" title="Configuracoes">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            </button>
             <span class="mode-badge mode-paper" id="mode-badge">PAPER</span>
         </div>
     </header>
@@ -1014,7 +1110,41 @@ DASHBOARD_HTML = r"""
             </div>
         </div>
     </main>
-
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg> Configuracoes</h2>
+                <button class="modal-close" onclick="closeSettings()">&times;</button>
+            </div>
+            <div class="setting-group">
+                <div class="setting-label">Chave Privada (Phantom Wallet)</div>
+                <div class="setting-desc">Base58 private key para executar trades reais. A chave fica salva no servidor e nunca e exposta.</div>
+                <div class="setting-input-wrap">
+                    <input type="password" id="setting-pk" placeholder="Cole sua private key aqui..." autocomplete="off" spellcheck="false">
+                    <button class="toggle-pw-btn" onclick="togglePkVisibility()" title="Mostrar/Esconder">
+                        <svg id="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
+                <div id="pk-current" class="key-mask" style="margin-top:6px;"></div>
+            </div>
+            <div class="setting-group">
+                <div class="setting-label">Modo de Operacao</div>
+                <div class="setting-toggle">
+                    <div>
+                        <div class="setting-toggle-label" id="mode-toggle-label">Paper Trading (Simulado)</div>
+                        <div class="setting-toggle-sub" id="mode-toggle-sub">Nenhum dinheiro real sera usado</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="setting-live-mode" onchange="updateModeLabel()">
+                        <span class="switch-slider"></span>
+                    </label>
+                </div>
+            </div>
+            <button class="modal-save-btn" id="settings-save-btn" onclick="saveSettings()">Salvar Configuracoes</button>
+            <div class="setting-status" id="settings-status"></div>
+        </div>
+    </div>
     <footer class="footer">
         SOL/USDC Trading Bot &middot; Paper Trading Mode &middot; Powered by Jupiter DEX + GeckoTerminal
     </footer>
@@ -1155,6 +1285,8 @@ function updateDashboard(data) {
         modeBadge.textContent = 'LIVE';
         modeBadge.className = 'mode-badge mode-live';
     }
+    currentPaperMode=!!data.paper_trading;
+    if(data.pk_mask)currentPkMask=data.pk_mask;
 
     // Indicators
     if (data.indicators) {
@@ -1678,6 +1810,52 @@ setInterval(() => {
 }, 5000);
 // Initial data load
 pollData();
+// === SETTINGS MODAL ===
+let currentPkMask='';
+let currentPaperMode=true;
+function openSettings(){
+    document.getElementById('settings-modal').classList.add('active');
+    document.getElementById('setting-pk').value='';
+    document.getElementById('settings-status').className='setting-status';
+    document.getElementById('settings-status').textContent='';
+    const pkEl=document.getElementById('pk-current');
+    if(currentPkMask){pkEl.textContent='Chave atual: '+currentPkMask;}else{pkEl.textContent='Nenhuma chave configurada';}
+    document.getElementById('setting-live-mode').checked=!currentPaperMode;
+    updateModeLabel();
+}
+function closeSettings(){document.getElementById('settings-modal').classList.remove('active');}
+document.getElementById('settings-modal').addEventListener('click',function(e){if(e.target===this)closeSettings();});
+function togglePkVisibility(){
+    const inp=document.getElementById('setting-pk');
+    inp.type=inp.type==='password'?'text':'password';
+}
+function updateModeLabel(){
+    const live=document.getElementById('setting-live-mode').checked;
+    const lbl=document.getElementById('mode-toggle-label');
+    const sub=document.getElementById('mode-toggle-sub');
+    if(live){lbl.textContent='MODO REAL (Live)';sub.textContent='Trades reais serao executados com dinheiro real!';sub.style.color='var(--red)';}
+    else{lbl.textContent='Paper Trading (Simulado)';sub.textContent='Nenhum dinheiro real sera usado';sub.style.color='var(--text-muted)';}
+}
+async function saveSettings(){
+    const btn=document.getElementById('settings-save-btn');
+    const status=document.getElementById('settings-status');
+    const pk=document.getElementById('setting-pk').value.trim();
+    const liveMode=document.getElementById('setting-live-mode').checked;
+    btn.disabled=true;btn.textContent='Salvando...';
+    status.className='setting-status';status.textContent='';
+    try{
+        const resp=await fetch('/api/save-settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({private_key:pk||null,paper_trading:!liveMode})});
+        const data=await resp.json();
+        if(data.ok){
+            status.className='setting-status success';
+            status.textContent='Configuracoes salvas com sucesso!';
+            if(pk){currentPkMask=pk.substring(0,4)+'...'+pk.substring(pk.length-4);document.getElementById('pk-current').textContent='Chave atual: '+currentPkMask;}
+            currentPaperMode=!liveMode;
+            setTimeout(closeSettings,2000);
+        }else{status.className='setting-status error';status.textContent=data.error||'Erro ao salvar';}
+    }catch(e){status.className='setting-status error';status.textContent='Erro de conexao: '+e.message;}
+    btn.disabled=false;btn.textContent='Salvar Configuracoes';
+}
 </script>
 </body>
 </html>
@@ -1696,6 +1874,7 @@ class DashboardServer:
         self.app.router.add_post('/api/toggle-strategy', self.handle_toggle_strategy)
         self.app.router.add_post('/api/allocate-strategy', self.handle_allocate_strategy)
         self.app.router.add_post('/api/deallocate-strategy', self.handle_deallocate_strategy)
+        self.app.router.add_post('/api/save-settings', self.handle_save_settings)
         self.app.router.add_get('/ws', self.handle_websocket)
         self.logs = []
         self.max_logs = 100
@@ -1744,6 +1923,7 @@ class DashboardServer:
             "strategies": self.bot.strategies.get_all_dashboard_data() if hasattr(self.bot, 'strategies') else {},
             "wallet": self.bot.wallet.get_data() if hasattr(self.bot, 'wallet') and self.bot.wallet else {},
             "allocations": self.bot.strategies.get_all_allocations() if hasattr(self.bot, 'strategies') else {},
+            "pk_mask": (config.SOLANA_PRIVATE_KEY[:4] + "..." + config.SOLANA_PRIVATE_KEY[-4:]) if len(config.SOLANA_PRIVATE_KEY) > 8 else "",
         }
 
     async def handle_status(self, request):
@@ -1792,6 +1972,16 @@ class DashboardServer:
                 ok = self.bot.strategies.deallocate_strategy(key)
                 return web.json_response({"ok": ok, "strategy": key})
             return web.json_response({"error": "strategies not available"}, status=500)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=400)
+
+    async def handle_save_settings(self, request):
+        try:
+            data = await request.json()
+            if hasattr(self.bot, '_apply_settings'):
+                self.bot._apply_settings(data)
+                return web.json_response({"ok": True})
+            return web.json_response({"error": "bot not available"}, status=500)
         except Exception as e:
             return web.json_response({"error": str(e)}, status=400)
 
