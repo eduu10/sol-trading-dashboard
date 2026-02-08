@@ -350,13 +350,13 @@ def get_dashboard_html():
         }
         .strat-help:hover { background: rgba(0,255,136,0.15); border-color: var(--green); color: var(--green); }
         .strat-tooltip {
-            display: none; position: absolute; top: 30px; right: 0; z-index: 1000;
-            width: 280px; padding: 16px; border-radius: 12px;
+            display: none; position: fixed; z-index: 9999;
+            width: 300px; padding: 16px; border-radius: 12px;
             background: #1a1a2e; border: 1px solid rgba(255,255,255,0.12);
-            box-shadow: 0 16px 48px rgba(0,0,0,0.6); font-weight: 400;
+            box-shadow: 0 16px 48px rgba(0,0,0,0.8); font-weight: 400;
             font-size: 0.85em; line-height: 1.6; color: var(--text-secondary);
+            pointer-events: none;
         }
-        .strat-help:hover .strat-tooltip { display: block; }
         .strat-tooltip-title { font-weight: 700; color: var(--text-primary); margin-bottom: 8px; font-size: 1em; }
         .strat-tooltip-tools { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 0.9em; color: var(--text-muted); }
         .strat-tooltip-tools span { color: var(--blue); font-weight: 500; }
@@ -794,6 +794,21 @@ function setPnl(id,val,isPct){const el=document.getElementById(id);if(!el)return
 function setText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
 function setBar(id,pct){const el=document.getElementById(id);if(!el)return;el.style.width=Math.min(100,Math.max(0,pct))+'%';el.style.background=pct>=60?'var(--green)':pct>=40?'var(--yellow)':'var(--red)';}
 function setRecent(id,items,renderer){const el=document.getElementById(id);if(!el||!items.length)return;el.innerHTML=items.map(renderer).join('');}
+// Tooltip positioning
+document.querySelectorAll('.strat-help').forEach(el=>{
+    const tip=el.querySelector('.strat-tooltip');if(!tip)return;
+    el.addEventListener('mouseenter',e=>{
+        tip.style.display='block';
+        const r=el.getBoundingClientRect();
+        let left=r.left+r.width/2-150;
+        let top=r.bottom+8;
+        if(left<8)left=8;
+        if(left+300>window.innerWidth-8)left=window.innerWidth-308;
+        if(top+tip.offsetHeight>window.innerHeight-8)top=r.top-tip.offsetHeight-8;
+        tip.style.left=left+'px';tip.style.top=top+'px';
+    });
+    el.addEventListener('mouseleave',()=>{tip.style.display='none';});
+});
 function renderAnalysisHistory(history){
     const container=document.getElementById('analysis-list');
     const reversed=history.slice().reverse();
