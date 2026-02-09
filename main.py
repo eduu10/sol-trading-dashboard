@@ -854,7 +854,9 @@ class TelegramBot:
                         )
                         # Registra trade parcial (so compra)
                         self.strategies.update_allocation_after_trade(
-                            strat_key, tx_buy, 0.0
+                            strat_key, tx_buy, 0.0,
+                            tx_buy=tx_buy, tx_sell="", amount_usd=amount_usd,
+                            coin=coin, direction=direction, sim_pnl_pct=sim_pnl_pct
                         )
                         self.strategies.mark_trade_executed(strat_key, trade_id, tx_buy)
                         continue
@@ -866,7 +868,9 @@ class TelegramBot:
                             f"Posicao aberta: {coins_received} {coin}"
                         )
                         self.strategies.update_allocation_after_trade(
-                            strat_key, tx_buy, 0.0
+                            strat_key, tx_buy, 0.0,
+                            tx_buy=tx_buy, tx_sell="", amount_usd=amount_usd,
+                            coin=coin, direction=direction, sim_pnl_pct=sim_pnl_pct
                         )
                         self.strategies.mark_trade_executed(strat_key, trade_id, tx_buy)
                         continue
@@ -883,14 +887,19 @@ class TelegramBot:
                     logger.error(f"[MODO REAL] {strat_key}: erro no swap: {ex}")
                     if tx_buy:
                         self.strategies.update_allocation_after_trade(
-                            strat_key, tx_buy, 0.0
+                            strat_key, tx_buy, 0.0,
+                            tx_buy=tx_buy or "", tx_sell="", amount_usd=amount_usd,
+                            coin=coin, direction=direction, sim_pnl_pct=sim_pnl_pct
                         )
                     continue
 
                 # Atualiza alocacao com resultado real
                 final_tx = tx_sell or tx_buy or "ERROR"
                 self.strategies.update_allocation_after_trade(
-                    strat_key, final_tx, real_pnl
+                    strat_key, final_tx, real_pnl,
+                    tx_buy=tx_buy or "", tx_sell=tx_sell or "",
+                    amount_usd=amount_usd, coin=coin,
+                    direction=direction, sim_pnl_pct=sim_pnl_pct
                 )
                 self.strategies.mark_trade_executed(strat_key, trade_id, final_tx)
 

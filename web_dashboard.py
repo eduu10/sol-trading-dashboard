@@ -1285,7 +1285,7 @@ function updateAllocationsFromData(allocData){
     if(!allocData)return;
     activeAllocations={};
     for(const[k,v]of Object.entries(allocData)){
-        if(v.active)activeAllocations[k]={amount:v.amount,coin:v.coin||'SOL',status:'active',pnl:v.pnl||0,trades:v.trades||0,last_tx:v.last_tx||'',sim_pnl_pct:v.sim_pnl_pct||0,last_trade_info:v.last_trade_info||null};
+        if(v.active)activeAllocations[k]={amount:v.amount,coin:v.coin||'SOL',status:'active',pnl:v.pnl||0,trades:v.trades||0,last_tx:v.last_tx||'',sim_pnl_pct:v.sim_pnl_pct||0,last_trade_info:v.last_trade_info||null,trade_history:v.trade_history||[]};
     }
     renderAllocations();
     renderRealModeSection();
@@ -1339,7 +1339,7 @@ function renderRealModeSection(){
             </div>
             <div class="strat-stats">
                 <div class="strat-stat-row"><span class="strat-stat-label">Status</span><span class="strat-stat-value" style="color:var(--green)">ATIVO</span></div>
-                <div class="strat-stat-row"><span class="strat-stat-label">Trades Executados</span><span class="strat-stat-value">${trades}</span></div>
+                <div class="strat-stat-row" style="cursor:pointer;" onclick="showTradeHistory('${k}')"><span class="strat-stat-label" style="text-decoration:underline;text-underline-offset:3px;">Trades Executados</span><span class="strat-stat-value" style="display:flex;align-items:center;gap:4px;">${trades} <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span></div>
             </div>
             <button class="alloc-stop-btn" style="width:100%;margin-top:12px;justify-content:center;" onclick="deallocateStrategy('${k}')">
                 <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> Parar Modo Real
@@ -1347,6 +1347,60 @@ function renderRealModeSection(){
         </div>`;
     }
     grid.innerHTML=html;
+}
+function showTradeHistory(stratKey){
+    const a=activeAllocations[stratKey];
+    if(!a)return;
+    const nameMap={sniper:'Sniping Pump.fun',memecoin:'Meme Coins',arbitrage:'Arbitragem DEX',scalping:'Scalping Tokens',leverage:'Leverage Trading'};
+    const history=(a.trade_history||[]).slice().reverse();
+    let existing=document.getElementById('trade-history-modal');
+    if(existing)existing.remove();
+    const modal=document.createElement('div');
+    modal.id='trade-history-modal';
+    modal.style.cssText='position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);';
+    let rows='';
+    if(history.length===0){
+        rows='<div style="text-align:center;padding:30px;color:var(--text-muted);">Nenhum trade executado ainda</div>';
+    } else {
+        let totalPnl=0;
+        let wins=0;
+        for(const t of history){
+            totalPnl+=t.pnl||0;
+            if((t.pnl||0)>0)wins++;
+            const d=new Date((t.time||0)*1000);
+            const dt=d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+            const pnl=t.pnl||0;
+            const pnlColor=pnl>0?'var(--green)':pnl<0?'var(--red)':'var(--text-muted)';
+            const statusIcon=t.status==='ok'?'✅':t.status==='partial'?'⚠️':'❌';
+            const simPct=t.sim_pnl_pct||0;
+            const txSell=t.tx_sell||'';
+            const txBuy=t.tx_buy||'';
+            const mainTx=txSell||txBuy;
+            const solscanLink=mainTx&&!mainTx.startsWith('PAPER')?`https://solscan.io/tx/${mainTx}`:'';
+            const txBtn=solscanLink?`<a href="${solscanLink}" target="_blank" style="color:var(--purple);font-size:0.7em;text-decoration:none;">Solscan ↗</a>`:'';
+            rows+=`<div style="display:grid;grid-template-columns:70px 1fr 80px 70px 50px;align-items:center;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.82em;">
+                <span style="color:var(--text-secondary);font-family:'JetBrains Mono',monospace;font-size:0.85em;">${dt}</span>
+                <span style="display:flex;align-items:center;gap:6px;"><span>${statusIcon}</span><span style="color:var(--text-primary)">${t.signal||'?'}</span><span style="color:var(--text-muted);font-size:0.85em;">${t.direction||''} $${(t.amount||0).toFixed(2)}</span></span>
+                <span style="text-align:right;font-family:'JetBrains Mono',monospace;font-weight:600;color:${pnlColor}">${pnl>=0?'+':'-'}$${Math.abs(pnl).toFixed(4)}</span>
+                <span style="text-align:right;color:var(--text-muted);font-size:0.85em;">Sim ${simPct>=0?'+':''}${simPct.toFixed(1)}%</span>
+                <span style="text-align:right;">${txBtn}</span>
+            </div>`;
+        }
+        const wr=history.length>0?((wins/history.length)*100).toFixed(0):'0';
+        rows=`<div style="display:flex;gap:16px;padding:12px 16px;background:rgba(255,255,255,0.03);border-bottom:1px solid rgba(255,255,255,0.08);font-size:0.8em;">
+            <span>Total: <b style="color:${totalPnl>=0?'var(--green)':'var(--red)'}">${totalPnl>=0?'+':'-'}$${Math.abs(totalPnl).toFixed(4)}</b></span>
+            <span>Win Rate: <b style="color:var(--green)">${wr}%</b> (${wins}/${history.length})</span>
+        </div>`+rows;
+    }
+    modal.innerHTML=`<div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:16px;width:90%;max-width:680px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-color);">
+            <div style="font-weight:700;font-size:1.05em;">📊 ${nameMap[stratKey]||stratKey} — Historico de Trades</div>
+            <button onclick="document.getElementById('trade-history-modal').remove()" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:1.4em;line-height:1;">×</button>
+        </div>
+        <div style="overflow-y:auto;flex:1;">${rows}</div>
+    </div>`;
+    modal.addEventListener('click',function(e){if(e.target===modal)modal.remove();});
+    document.body.appendChild(modal);
 }
 // Tooltip system: move all tooltips to body so overflow:hidden on cards won't clip
 (function(){

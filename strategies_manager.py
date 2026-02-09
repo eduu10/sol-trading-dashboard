@@ -223,7 +223,10 @@ class StrategiesManager:
 
         return signals
 
-    def update_allocation_after_trade(self, key: str, tx_hash: str, pnl_usd: float):
+    def update_allocation_after_trade(self, key: str, tx_hash: str, pnl_usd: float,
+                                      tx_buy: str = "", tx_sell: str = "",
+                                      amount_usd: float = 0, coin: str = "SOL",
+                                      direction: str = "long", sim_pnl_pct: float = 0):
         """Atualiza dados da alocacao apos executar trade real."""
         if key not in self.allocations:
             return
@@ -238,6 +241,26 @@ class StrategiesManager:
         if trade_info:
             alloc["last_trade_info"] = trade_info
             alloc["sim_pnl_pct"] = trade_info.get("pnl_pct", 0)
+
+        # Registra no historico de trades
+        if "trade_history" not in alloc:
+            alloc["trade_history"] = []
+        trade_record = {
+            "time": time.time(),
+            "pnl": pnl_usd,
+            "tx_buy": tx_buy,
+            "tx_sell": tx_sell,
+            "amount": amount_usd or alloc.get("amount", 0),
+            "coin": coin,
+            "direction": direction,
+            "sim_pnl_pct": sim_pnl_pct,
+            "signal": trade_info.get("name", trade_info.get("token", "?")) if trade_info else "?",
+            "status": "ok" if tx_sell else ("partial" if tx_buy else "failed"),
+        }
+        alloc["trade_history"].append(trade_record)
+        # Limita a 100 trades no historico
+        if len(alloc["trade_history"]) > 100:
+            alloc["trade_history"] = alloc["trade_history"][-100:]
 
         self._save_allocations()
 
@@ -284,7 +307,6 @@ class StrategiesManager:
         if key in self.allocations:
             self.allocations[key]["last_trade_id"] = trade_id
             self.allocations[key]["last_tx"] = tx_hash
-            self.allocations[key]["trades"] = self.allocations[key].get("trades", 0) + 1
             self._save_allocations()
 
     def get_all_dashboard_data(self) -> Dict:
