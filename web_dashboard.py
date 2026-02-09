@@ -1799,6 +1799,11 @@ async def handle_deallocate_strategy(request):
             "action": "deallocate_strategy",
             "strategy": key,
         })
+        # Marca como inativo imediatamente no BOT_DATA para que
+        # o frontend nao restaure ao recarregar a pagina
+        allocs = BOT_DATA.get("allocations")
+        if isinstance(allocs, dict) and key in allocs:
+            allocs[key]["active"] = False
         _save_persistent_state()
         return web.json_response({"ok": True, "strategy": key, "queued": True})
     except Exception as e:
