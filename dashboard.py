@@ -1517,15 +1517,14 @@ function renderRealModeSection(){
         const pnlColor=pnl>0?'var(--green)':pnl<0?'var(--red)':'var(--text-muted)';
         const pctColor=simPct>0?'var(--green)':simPct<0?'var(--red)':'var(--text-muted)';
         const lastTx=a.last_tx||'';
-        const shortTx=lastTx?lastTx.substring(0,12)+'...':'Nenhum';
         const txLink=lastTx&&!lastTx.startsWith('PAPER')?`https://solscan.io/tx/${lastTx}`:'';
         const info=a.last_trade_info;
         let infoHtml='';
         if(info){const ip=info.pnl_pct||0;infoHtml=`<div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Ultimo Sinal</span><span class="strat-cap-value" style="color:${ip>=0?'var(--green)':'var(--red)'}">${info.name||info.token||'?'} ${info.status||'?'} ${ip>=0?'+':''}${ip.toFixed(1)}%</span></div>`;}
         let txHtml='';
         if(lastTx){
-            if(txLink){txHtml=`<div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Ultima TX</span><span class="strat-cap-value"><a href="${txLink}" target="_blank" style="color:var(--purple);text-decoration:underline;">${shortTx}</a></span></div>`;}
-            else{txHtml=`<div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Ultima TX</span><span class="strat-cap-value" style="color:var(--text-muted)">${shortTx}</span></div>`;}
+            if(txLink){txHtml=`<div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Ultima TX</span><span class="strat-cap-value" style="word-break:break-all;font-size:0.7em;line-height:1.4"><a href="${txLink}" target="_blank" style="color:var(--purple);text-decoration:underline;">${lastTx}</a></span></div>`;}
+            else{txHtml=`<div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Ultima TX</span><span class="strat-cap-value" style="color:var(--text-muted);word-break:break-all;font-size:0.7em;line-height:1.4">${lastTx}</span></div>`;}
         }
         html+=`<div class="strat-card real-mode ${riskMap[k]||''}" id="real-${k}">
             <div class="strat-header">
