@@ -57,6 +57,9 @@ BOT_DATA = {
 # Comandos pendentes para o bot (o bot le na resposta do push)
 PENDING_COMMANDS = []
 
+# Estrategias marcadas como inativas pelo usuario (persiste ate bot confirmar)
+FORCED_INACTIVE = set()
+
 # Secret key para o bot enviar dados (evita spam)
 API_KEY = os.environ.get("DASHBOARD_API_KEY", "sol-trading-2026")
 
@@ -68,6 +71,7 @@ def _save_persistent_state():
         state = {
             "pending_settings": BOT_DATA.get("pending_settings"),
             "pending_commands": PENDING_COMMANDS[:],
+            "forced_inactive": list(FORCED_INACTIVE),
             "sessions": {k: v for k, v in SESSIONS.items()
                          if time.time() - v.get("created", 0) < SESSION_MAX_AGE},
         }
@@ -79,7 +83,7 @@ def _save_persistent_state():
 
 def _load_persistent_state():
     """Carrega estado salvo em disco."""
-    global PENDING_COMMANDS, SESSIONS
+    global PENDING_COMMANDS, SESSIONS, FORCED_INACTIVE
     try:
         with open(PERSIST_FILE) as f:
             state = json.load(f)
@@ -89,6 +93,9 @@ def _load_persistent_state():
         cmds = state.get("pending_commands", [])
         if cmds:
             PENDING_COMMANDS.extend(cmds)
+        fi = state.get("forced_inactive", [])
+        if fi:
+            FORCED_INACTIVE.update(fi)
         saved_sessions = state.get("sessions", {})
         for k, v in saved_sessions.items():
             if time.time() - v.get("created", 0) < SESSION_MAX_AGE:
@@ -1731,45 +1738,19 @@ async def handle_push_data(request):
         # Se bot confirma que aplicou settings, limpa pending
         if data.get("settings_applied"):
             BOT_DATA.pop("pending_settings", None)
-        # Merge inteligente de allocations: preserva estado local de Play/Stop
-        # ate o bot processar os comandos pendentes
+        # Merge allocations: usa dados do bot mas respeita FORCED_INACTIVE
         incoming_allocs = data.pop("allocations", None)
         BOT_DATA.update(data)
         if incoming_allocs is not None:
-            local_allocs = BOT_DATA.get("allocations", {})
-            if isinstance(local_allocs, dict):
-                for key, bot_val in incoming_allocs.items():
-                    local_val = local_allocs.get(key)
-                    if local_val is None:
-                        # Bot tem, local nao: usar dados do bot
-                        local_allocs[key] = bot_val
-                    elif local_val.get("active") and not bot_val.get("active"):
-                        # Local marcou ativo via Play, bot ainda nao processou:
-                        # se tem comando pendente de allocate, preserva local
-                        has_pending = any(
-                            c.get("action") == "allocate_strategy" and c.get("strategy") == key
-                            for c in PENDING_COMMANDS
-                        )
-                        if has_pending:
-                            pass  # Mantém o local ativo
-                        else:
-                            local_allocs[key] = bot_val
-                    elif not local_val.get("active") and bot_val.get("active"):
-                        # Local marcou inativo via Stop, bot ainda nao processou:
-                        has_pending = any(
-                            c.get("action") == "deallocate_strategy" and c.get("strategy") == key
-                            for c in PENDING_COMMANDS
-                        )
-                        if has_pending:
-                            pass  # Mantém o local inativo
-                        else:
-                            local_allocs[key] = bot_val
+            for key, bot_val in incoming_allocs.items():
+                if key in FORCED_INACTIVE:
+                    if not bot_val.get("active"):
+                        # Bot confirmou que desalocou: remove do forced
+                        FORCED_INACTIVE.discard(key)
                     else:
-                        # Mesmo estado: usar dados do bot (mais recentes)
-                        local_allocs[key] = bot_val
-                BOT_DATA["allocations"] = local_allocs
-            else:
-                BOT_DATA["allocations"] = incoming_allocs
+                        # Bot ainda nao processou: forcar inativo
+                        bot_val["active"] = False
+            BOT_DATA["allocations"] = incoming_allocs
         BOT_DATA["last_push"] = time.time()
         # Retorna comandos pendentes para o bot
         cmds = list(PENDING_COMMANDS)
@@ -1858,8 +1839,8 @@ async def handle_deallocate_strategy(request):
             "action": "deallocate_strategy",
             "strategy": key,
         })
-        # Marca como inativo imediatamente no BOT_DATA para que
-        # o frontend nao restaure ao recarregar a pagina
+        # Marca como inativo imediatamente e persiste ate bot confirmar
+        FORCED_INACTIVE.add(key)
         allocs = BOT_DATA.get("allocations")
         if isinstance(allocs, dict) and key in allocs:
             allocs[key]["active"] = False
