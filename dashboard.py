@@ -1397,6 +1397,7 @@ function updateDashboard(data) {
         document.getElementById('wallet-total').textContent='$'+(solUsd+usdc).toFixed(2);
     }
     if(data.allocations){updateAllocationsFromData(data.allocations);}
+    if(data.real_positions!==undefined){realPositions={};for(const p of data.real_positions){realPositions[p.strategy]=p;}renderRealModeSection();}
 
     // Strategies
     if(data.strategies){updateStrategies(data.strategies);}
@@ -1439,6 +1440,7 @@ async function toggleStrategy(key){
 }
 // === Allocation system ===
 let activeAllocations={};
+let realPositions={};
 const pendingDeallocations=new Set();
 function coinDecimals(c){return(c==='USDC'||c==='USDT')?2:c==='BONK'?0:c==='WBTC'?6:4;}
 function fmtCoinAmt(amt,coin){return parseFloat(amt).toFixed(coinDecimals(coin));}
@@ -1552,6 +1554,31 @@ function renderRealModeSection(){
             if(txLink){txHtml=`<div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Ultima TX</span><span class="strat-cap-value" style="word-break:break-all;font-size:0.7em;line-height:1.4"><a href="${txLink}" target="_blank" style="color:var(--purple);text-decoration:underline;">${lastTx}</a></span></div>`;}
             else{txHtml=`<div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Ultima TX</span><span class="strat-cap-value" style="color:var(--text-muted);word-break:break-all;font-size:0.7em;line-height:1.4">${lastTx}</span></div>`;}
         }
+        const rp=realPositions[k];
+        const hasPos=!!rp;
+        const uPnl=hasPos?(rp.unrealized_pnl_usd||0):0;
+        const uPnlPct=hasPos?(rp.unrealized_pnl_pct||0):0;
+        const uPnlColor=uPnl>0?'var(--green)':uPnl<0?'var(--red)':'var(--text-muted)';
+        let holdStr='';
+        if(hasPos){const hs=rp.hold_time_s||0;holdStr=hs<120?hs+'s':hs<7200?Math.floor(hs/60)+'min':Math.floor(hs/3600)+'h';}
+        let posHtml='';
+        if(hasPos){
+            const maxH=rp.max_hold_s||0;const maxStr=maxH<120?maxH+'s':maxH<7200?Math.floor(maxH/60)+'min':Math.floor(maxH/3600)+'h';
+            const holdPct=maxH>0?Math.min(100,((rp.hold_time_s||0)/maxH)*100):0;
+            posHtml=`<div style="background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.15);border-radius:8px;padding:10px;margin:8px 0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <span style="color:var(--green);font-weight:700;font-size:0.75em;text-transform:uppercase;letter-spacing:1px;">Posicao Aberta</span>
+                    <span style="color:${uPnlColor};font-weight:700;font-size:0.85em;">${uPnl>=0?'+':''}$${uPnl.toFixed(4)} (${uPnlPct>=0?'+':''}${uPnlPct.toFixed(1)}%)</span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:0.75em;">
+                    <div><span style="color:var(--text-muted);">TP</span> <span style="color:var(--green);">+${rp.tp_pct||0}%</span></div>
+                    <div><span style="color:var(--text-muted);">SL</span> <span style="color:var(--red);">-${rp.sl_pct||0}%</span></div>
+                    <div><span style="color:var(--text-muted);">Hold</span> <span style="color:var(--yellow);">${holdStr} / ${maxStr}</span></div>
+                    ${rp.trailing_pct>0?`<div><span style="color:var(--text-muted);">Trail</span> <span style="color:var(--purple);">${rp.trailing_pct}%</span></div>`:`<div></div>`}
+                </div>
+                ${maxH>0?`<div style="margin-top:6px;height:3px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;"><div style="height:100%;width:${holdPct}%;background:${holdPct>80?'var(--red)':holdPct>50?'var(--yellow)':'var(--green)'};transition:width 0.3s;"></div></div>`:''}
+            </div>`;
+        }
         html+=`<div class="strat-card real-mode ${riskMap[k]||''}" id="real-${k}">
             <div class="strat-header">
                 <div class="strat-name">${nameMap[k]||k}</div>
@@ -1561,18 +1588,20 @@ function renderRealModeSection(){
                 <span class="real-coin-badge">${a.coin||'SOL'}</span>
                 <span class="strat-badge return-badge">${fmtCoinAmt(a.amount,a.coin||'SOL')} ${a.coin||'SOL'}</span>
                 <span class="strat-badge time-badge">${trades} trade${trades!==1?'s':''}</span>
+                ${hasPos?'<span class="strat-badge" style="background:rgba(0,255,136,0.15);color:var(--green);">HOLDING</span>':''}
             </div>
             <div class="strat-pnl ${pnlCls}" id="real-${k}-pnl">${pnl>=0?'+$':'-$'}${Math.abs(pnl).toFixed(4)}</div>
+            ${posHtml}
             <div class="strat-capital">
                 <div class="strat-cap-item"><span class="strat-cap-label">Alocado</span><span class="strat-cap-value" style="color:var(--yellow)">${fmtCoinAmt(a.amount,a.coin||'SOL')} ${a.coin||'SOL'}</span></div>
                 <div class="strat-cap-item"><span class="strat-cap-label">Moeda</span><span class="strat-cap-value" style="color:var(--purple)">${a.coin||'SOL'}</span></div>
-                <div class="strat-cap-item"><span class="strat-cap-label">Sim %</span><span class="strat-cap-value" style="color:${pctColor}">${simPct>=0?'+':''}${simPct.toFixed(1)}%</span></div>
                 <div class="strat-cap-item"><span class="strat-cap-label">P&L Real</span><span class="strat-cap-value" style="color:${pnlColor}">${pnl>=0?'+$':'-$'}${Math.abs(pnl).toFixed(4)}</span></div>
+                <div class="strat-cap-item"><span class="strat-cap-label">${hasPos?'PnL Aberto':'Sim %'}</span><span class="strat-cap-value" style="color:${hasPos?uPnlColor:pctColor}">${hasPos?(uPnlPct>=0?'+':'')+uPnlPct.toFixed(1)+'%':(simPct>=0?'+':'')+simPct.toFixed(1)+'%'}</span></div>
                 ${infoHtml}
                 ${txHtml}
             </div>
             <div class="strat-stats">
-                <div class="strat-stat-row"><span class="strat-stat-label">Status</span><span class="strat-stat-value" style="color:var(--green)">ATIVO</span></div>
+                <div class="strat-stat-row"><span class="strat-stat-label">Status</span><span class="strat-stat-value" style="color:${hasPos?'var(--green)':'var(--text-muted)'}">${hasPos?'HOLDING':'AGUARDANDO'}</span></div>
                 <div class="strat-stat-row" style="cursor:pointer;" onclick="showTradeHistory('${k}')"><span class="strat-stat-label" style="text-decoration:underline;text-underline-offset:3px;">Trades Executados</span><span class="strat-stat-value" style="display:flex;align-items:center;gap:4px;">${trades} <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span></div>
             </div>
             <button class="alloc-stop-btn" style="width:100%;margin-top:12px;justify-content:center;" onclick="deallocateStrategy('${k}')">
