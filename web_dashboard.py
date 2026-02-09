@@ -713,8 +713,8 @@ def get_dashboard_html():
                         <option value="WBTC">WBTC</option>
                     </select>
                     <div class="alloc-amount-wrap">
-                        <span class="alloc-currency">$</span>
-                        <input type="number" id="alloc-amount" class="alloc-input" placeholder="0.00" min="0.01" step="0.01"/>
+                        <span class="alloc-currency" id="alloc-currency-label">SOL</span>
+                        <input type="number" id="alloc-amount" class="alloc-input" placeholder="0.000" min="0.001" step="0.001"/>
                     </div>
                     <button class="alloc-play-btn" id="alloc-play-btn" onclick="allocateStrategy()">
                         <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><polygon points="5,3 19,12 5,21"/></svg>
@@ -1242,6 +1242,12 @@ async function toggleStrategy(key){
 // === Allocation system ===
 let activeAllocations={};
 const pendingDeallocations=new Set();
+function coinDecimals(c){return(c==='USDC'||c==='USDT')?2:c==='BONK'?0:c==='WBTC'?6:4;}
+function fmtCoinAmt(amt,coin){return parseFloat(amt).toFixed(coinDecimals(coin));}
+(function(){const cs=document.getElementById('alloc-coin');if(cs)cs.addEventListener('change',function(){
+    const lbl=document.getElementById('alloc-currency-label');if(lbl)lbl.textContent=this.value;
+    const inp=document.getElementById('alloc-amount');if(inp){const d=coinDecimals(this.value);inp.step=Math.pow(10,-d).toString();inp.placeholder='0.'+'0'.repeat(d);}
+});})();
 async function allocateStrategy(){
     const sel=document.getElementById('alloc-strategy');
     const coinSel=document.getElementById('alloc-coin');
@@ -1299,7 +1305,7 @@ function renderAllocations(){
         const a=activeAllocations[k];
         html+=`<div class="alloc-active-item">
             <span class="alloc-strat-name">${nameMap[k]||k}</span>
-            <span class="alloc-strat-amount">$${a.amount.toFixed(2)} ${a.coin||'SOL'}</span>
+            <span class="alloc-strat-amount">${fmtCoinAmt(a.amount,a.coin||'SOL')} ${a.coin||'SOL'}</span>
             <span class="alloc-strat-status">ATIVO</span>
             <button class="alloc-stop-btn" onclick="deallocateStrategy('${k}')">
                 <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> Stop
@@ -1356,12 +1362,12 @@ function renderRealModeSection(){
             </div>
             <div class="strat-badges">
                 <span class="real-coin-badge">${a.coin||'SOL'}</span>
-                <span class="strat-badge return-badge">$${a.amount.toFixed(2)}</span>
+                <span class="strat-badge return-badge">${fmtCoinAmt(a.amount,a.coin||'SOL')} ${a.coin||'SOL'}</span>
                 <span class="strat-badge time-badge">${trades} trade${trades!==1?'s':''}</span>
             </div>
             <div class="strat-pnl ${pnlCls}" id="real-${k}-pnl">${pnl>=0?'+$':'-$'}${Math.abs(pnl).toFixed(4)}</div>
             <div class="strat-capital">
-                <div class="strat-cap-item"><span class="strat-cap-label">Alocado</span><span class="strat-cap-value" style="color:var(--yellow)">$${a.amount.toFixed(2)}</span></div>
+                <div class="strat-cap-item"><span class="strat-cap-label">Alocado</span><span class="strat-cap-value" style="color:var(--yellow)">${fmtCoinAmt(a.amount,a.coin||'SOL')} ${a.coin||'SOL'}</span></div>
                 <div class="strat-cap-item"><span class="strat-cap-label">Moeda</span><span class="strat-cap-value" style="color:var(--purple)">${a.coin||'SOL'}</span></div>
                 <div class="strat-cap-item"><span class="strat-cap-label">Sim %</span><span class="strat-cap-value" style="color:${pctColor}">${simPct>=0?'+':''}${simPct.toFixed(1)}%</span></div>
                 <div class="strat-cap-item"><span class="strat-cap-label">P&L Real</span><span class="strat-cap-value" style="color:${pnlColor}">${pnl>=0?'+$':'-$'}${Math.abs(pnl).toFixed(4)}</span></div>
