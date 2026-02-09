@@ -68,9 +68,12 @@ def _save_persistent_state():
     """Salva estado critico em disco (sobrevive restarts do processo)."""
     try:
         os.makedirs(PERSIST_DIR, exist_ok=True)
+        # Só persistir comandos criticos (deallocate/settings), nao allocate
+        safe_cmds = [c for c in PENDING_COMMANDS
+                     if c.get("action") in ("deallocate_strategy", "save_settings")]
         state = {
             "pending_settings": BOT_DATA.get("pending_settings"),
-            "pending_commands": PENDING_COMMANDS[:],
+            "pending_commands": safe_cmds,
             "forced_inactive": list(FORCED_INACTIVE),
             "sessions": {k: v for k, v in SESSIONS.items()
                          if time.time() - v.get("created", 0) < SESSION_MAX_AGE},
