@@ -1300,11 +1300,14 @@ function renderAllocations(){
 }
 function updateAllocationsFromData(allocData){
     if(!allocData)return;
-    activeAllocations={};
+    const prev=JSON.stringify(activeAllocations);
+    const newAllocs={};
     for(const[k,v]of Object.entries(allocData)){
-        if(v.active&&!pendingDeallocations.has(k))activeAllocations[k]={amount:v.amount,coin:v.coin||'SOL',status:'active',pnl:v.pnl||0,trades:v.trades||0,last_tx:v.last_tx||'',sim_pnl_pct:v.sim_pnl_pct||0,last_trade_info:v.last_trade_info||null,trade_history:v.trade_history||[]};
+        if(v.active&&!pendingDeallocations.has(k))newAllocs[k]={amount:v.amount,coin:v.coin||'SOL',status:'active',pnl:v.pnl||0,trades:v.trades||0,last_tx:v.last_tx||'',sim_pnl_pct:v.sim_pnl_pct||0,last_trade_info:v.last_trade_info||null,trade_history:v.trade_history||[]};
         if(!v.active)pendingDeallocations.delete(k);
     }
+    if(JSON.stringify(newAllocs)===prev)return;
+    activeAllocations=newAllocs;
     renderAllocations();
     renderRealModeSection();
 }
@@ -1728,7 +1731,45 @@ async def handle_push_data(request):
         # Se bot confirma que aplicou settings, limpa pending
         if data.get("settings_applied"):
             BOT_DATA.pop("pending_settings", None)
+        # Merge inteligente de allocations: preserva estado local de Play/Stop
+        # ate o bot processar os comandos pendentes
+        incoming_allocs = data.pop("allocations", None)
         BOT_DATA.update(data)
+        if incoming_allocs is not None:
+            local_allocs = BOT_DATA.get("allocations", {})
+            if isinstance(local_allocs, dict):
+                for key, bot_val in incoming_allocs.items():
+                    local_val = local_allocs.get(key)
+                    if local_val is None:
+                        # Bot tem, local nao: usar dados do bot
+                        local_allocs[key] = bot_val
+                    elif local_val.get("active") and not bot_val.get("active"):
+                        # Local marcou ativo via Play, bot ainda nao processou:
+                        # se tem comando pendente de allocate, preserva local
+                        has_pending = any(
+                            c.get("action") == "allocate_strategy" and c.get("strategy") == key
+                            for c in PENDING_COMMANDS
+                        )
+                        if has_pending:
+                            pass  # Mantém o local ativo
+                        else:
+                            local_allocs[key] = bot_val
+                    elif not local_val.get("active") and bot_val.get("active"):
+                        # Local marcou inativo via Stop, bot ainda nao processou:
+                        has_pending = any(
+                            c.get("action") == "deallocate_strategy" and c.get("strategy") == key
+                            for c in PENDING_COMMANDS
+                        )
+                        if has_pending:
+                            pass  # Mantém o local inativo
+                        else:
+                            local_allocs[key] = bot_val
+                    else:
+                        # Mesmo estado: usar dados do bot (mais recentes)
+                        local_allocs[key] = bot_val
+                BOT_DATA["allocations"] = local_allocs
+            else:
+                BOT_DATA["allocations"] = incoming_allocs
         BOT_DATA["last_push"] = time.time()
         # Retorna comandos pendentes para o bot
         cmds = list(PENDING_COMMANDS)

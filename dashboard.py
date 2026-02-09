@@ -1507,11 +1507,14 @@ function renderAllocations(){
 }
 function updateAllocationsFromData(allocData){
     if(!allocData)return;
-    activeAllocations={};
+    const prev=JSON.stringify(activeAllocations);
+    const newAllocs={};
     for(const[k,v]of Object.entries(allocData)){
-        if(v.active&&!pendingDeallocations.has(k))activeAllocations[k]={amount:v.amount,coin:v.coin||'SOL',status:'active',pnl:v.pnl||0,trades:v.trades||0,last_tx:v.last_tx||'',sim_pnl_pct:v.sim_pnl_pct||0,last_trade_info:v.last_trade_info||null,trade_history:v.trade_history||[]};
+        if(v.active&&!pendingDeallocations.has(k))newAllocs[k]={amount:v.amount,coin:v.coin||'SOL',status:'active',pnl:v.pnl||0,trades:v.trades||0,last_tx:v.last_tx||'',sim_pnl_pct:v.sim_pnl_pct||0,last_trade_info:v.last_trade_info||null,trade_history:v.trade_history||[]};
         if(!v.active)pendingDeallocations.delete(k);
     }
+    if(JSON.stringify(newAllocs)===prev)return;
+    activeAllocations=newAllocs;
     renderAllocations();
     renderRealModeSection();
 }
