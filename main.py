@@ -759,6 +759,18 @@ class TelegramBot:
         try:
             signals = self.strategies.get_new_trade_signals(before_counts)
 
+            # Converte amount_raw + amount_coin para amount_usd
+            sol_price = current_price if current_price > 0 else 100
+            for sig in signals:
+                raw = sig.pop("amount_raw", 0)
+                acoin = sig.pop("amount_coin", "USDC")
+                if acoin == "USDC" or acoin == "USDT":
+                    sig["amount_usd"] = raw
+                else:
+                    # Converte para USD usando preco atual
+                    sig["amount_usd"] = round(raw * sol_price, 4) if acoin == "SOL" else raw
+                sig["coin"] = acoin
+
             # Auto-funding: se tem sinais e pouco USDC, converte SOL->USDC
             if signals and not config.PAPER_TRADING:
                 usdc_bal = self.wallet.last_usdc_balance if self.wallet else 0

@@ -128,7 +128,7 @@ class StrategiesManager:
             "trades": 0,
         }
         self._save_allocations()
-        logger.info(f"ALOCACAO REAL: ${amount:.2f} -> estrategia '{key}'")
+        logger.info(f"ALOCACAO REAL: {amount:.4f} {coin} -> estrategia '{key}'")
         return True
 
     def deallocate_strategy(self, key: str) -> bool:
@@ -208,8 +208,8 @@ class StrategiesManager:
             signals.append({
                 "strategy": key,
                 "direction": direction,
-                "amount_usd": alloc["amount"],
-                "coin": coin,
+                "amount_raw": alloc["amount"],
+                "amount_coin": coin,
                 "trade_id": trade_id,
                 "trade_info": trade_info,
                 "sim_pnl_pct": pnl_pct,
@@ -218,7 +218,7 @@ class StrategiesManager:
 
             logger.info(
                 f"[MODO REAL] Sinal detectado: {key} {direction} "
-                f"${alloc['amount']:.2f} {coin} | Sim: {pnl_pct:+.1f}%"
+                f"{alloc['amount']:.4f} {coin} | Sim: {pnl_pct:+.1f}%"
             )
 
         return signals
