@@ -1247,8 +1247,9 @@ async function allocateStrategy(){
         const resp=await fetch('/api/allocate-strategy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:strategy,amount:amount,coin:coin})});
         const data=await resp.json();
         if(data.ok){
-            activeAllocations[strategy]={amount:amount,coin:coin,status:'active'};
+            activeAllocations[strategy]={amount:amount,coin:coin,status:'active',pnl:0,trades:0,last_tx:'',sim_pnl_pct:0,last_trade_info:null,trade_history:[]};
             renderAllocations();
+            renderRealModeSection();
             sel.value='';inp.value='';
         }else{alert('Erro: '+(data.error||'desconhecido'));}
     }catch(e){alert('Erro de conexao: '+e);}
@@ -1779,6 +1780,23 @@ async def handle_allocate_strategy(request):
             "amount": amount,
             "coin": coin,
         })
+        # Marca como ativo imediatamente no BOT_DATA
+        allocs = BOT_DATA.get("allocations")
+        if not isinstance(allocs, dict):
+            allocs = {}
+            BOT_DATA["allocations"] = allocs
+        allocs[key] = {
+            "amount": amount,
+            "coin": coin,
+            "active": True,
+            "allocated_at": time.time(),
+            "pnl": 0,
+            "trades": 0,
+            "last_tx": "",
+            "sim_pnl_pct": 0,
+            "last_trade_info": None,
+            "trade_history": [],
+        }
         _save_persistent_state()
         return web.json_response({"ok": True, "strategy": key, "amount": amount, "coin": coin, "queued": True})
     except Exception as e:

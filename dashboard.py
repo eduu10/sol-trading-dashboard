@@ -1455,8 +1455,9 @@ async function allocateStrategy(){
         const resp=await fetch('/api/allocate-strategy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:strategy,amount:amount,coin:coin})});
         const data=await resp.json();
         if(data.ok){
-            activeAllocations[strategy]={amount:amount,coin:coin,status:'active'};
+            activeAllocations[strategy]={amount:amount,coin:coin,status:'active',pnl:0,trades:0,last_tx:'',sim_pnl_pct:0,last_trade_info:null,trade_history:[]};
             renderAllocations();
+            renderRealModeSection();
             sel.value='';inp.value='';
         }else{alert('Erro: '+(data.error||'desconhecido'));}
     }catch(e){alert('Erro de conexao: '+e);}
