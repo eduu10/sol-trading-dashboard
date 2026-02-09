@@ -927,6 +927,14 @@ class TelegramBot:
         except Exception as e:
             logger.debug(f"Profit withdraw check error: {e}")
 
+        # Atualiza wallet DEPOIS dos trades para refletir saldos reais
+        if self.wallet:
+            try:
+                self.wallet.last_update = 0  # Invalida cache
+                wallet_data = await self.wallet.update_balances()
+            except Exception as e:
+                logger.debug(f"Wallet post-trade update error: {e}")
+
         # Push para dashboard na nuvem
         try:
             dashboard = self.executor.get_dashboard_data(current_price)
