@@ -1231,6 +1231,7 @@ async function toggleStrategy(key){
 }
 // === Allocation system ===
 let activeAllocations={};
+const pendingDeallocations=new Set();
 async function allocateStrategy(){
     const sel=document.getElementById('alloc-strategy');
     const coinSel=document.getElementById('alloc-coin');
@@ -1261,8 +1262,9 @@ async function deallocateStrategy(key){
         const trades=a.trades||0;
         const pnlStr=pnl>=0?'+$'+pnl.toFixed(4):'-$'+Math.abs(pnl).toFixed(4);
         if(!confirm('Parar MODO REAL para '+(nameMap[key]||key)+'?\n\nTrades: '+trades+'\nP&L: '+pnlStr+'\n\nO USDC sera convertido de volta para SOL.'))return;
+        pendingDeallocations.add(key);
         const resp=await fetch('/api/deallocate-strategy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:key})});
-        if(resp.status===401){window.location.href='/login';return;}
+        if(resp.status===401){pendingDeallocations.delete(key);window.location.href='/login';return;}
         const result=await resp.json();
         if(result.ok){
             alert((nameMap[key]||key)+' encerrado!\n\nTrades: '+trades+'\nP&L Final: '+pnlStr+'\n\nO bot convertera o USDC restante para SOL.');
@@ -1270,9 +1272,10 @@ async function deallocateStrategy(key){
             renderAllocations();
             renderRealModeSection();
         }else{
+            pendingDeallocations.delete(key);
             alert('Erro ao parar: '+(result.error||'desconhecido'));
         }
-    }catch(e){alert('Erro de conexao: '+e.message);}
+    }catch(e){pendingDeallocations.delete(key);alert('Erro de conexao: '+e.message);}
 }
 function renderAllocations(){
     const container=document.getElementById('alloc-active-list');
@@ -1298,7 +1301,8 @@ function updateAllocationsFromData(allocData){
     if(!allocData)return;
     activeAllocations={};
     for(const[k,v]of Object.entries(allocData)){
-        if(v.active)activeAllocations[k]={amount:v.amount,coin:v.coin||'SOL',status:'active',pnl:v.pnl||0,trades:v.trades||0,last_tx:v.last_tx||'',sim_pnl_pct:v.sim_pnl_pct||0,last_trade_info:v.last_trade_info||null,trade_history:v.trade_history||[]};
+        if(v.active&&!pendingDeallocations.has(k))activeAllocations[k]={amount:v.amount,coin:v.coin||'SOL',status:'active',pnl:v.pnl||0,trades:v.trades||0,last_tx:v.last_tx||'',sim_pnl_pct:v.sim_pnl_pct||0,last_trade_info:v.last_trade_info||null,trade_history:v.trade_history||[]};
+        if(!v.active)pendingDeallocations.delete(k);
     }
     renderAllocations();
     renderRealModeSection();

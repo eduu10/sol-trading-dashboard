@@ -1439,6 +1439,7 @@ async function toggleStrategy(key){
 }
 // === Allocation system ===
 let activeAllocations={};
+const pendingDeallocations=new Set();
 async function allocateStrategy(){
     const sel=document.getElementById('alloc-strategy');
     const coinSel=document.getElementById('alloc-coin');
@@ -1469,6 +1470,7 @@ async function deallocateStrategy(key){
         const trades=a.trades||0;
         const pnlStr=pnl>=0?'+$'+pnl.toFixed(4):'-$'+Math.abs(pnl).toFixed(4);
         if(!confirm('Parar MODO REAL para '+(nameMap[key]||key)+'?\n\nTrades: '+trades+'\nP&L: '+pnlStr+'\n\nO USDC sera convertido de volta para SOL.'))return;
+        pendingDeallocations.add(key);
         const resp=await fetch('/api/deallocate-strategy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:key})});
         const result=await resp.json();
         if(result.ok){
@@ -1477,9 +1479,10 @@ async function deallocateStrategy(key){
             renderAllocations();
             renderRealModeSection();
         }else{
+            pendingDeallocations.delete(key);
             alert('Erro ao parar: '+(result.error||'desconhecido'));
         }
-    }catch(e){alert('Erro de conexao: '+e.message);}
+    }catch(e){pendingDeallocations.delete(key);alert('Erro de conexao: '+e.message);}
 }
 function renderAllocations(){
     const container=document.getElementById('alloc-active-list');
@@ -1505,7 +1508,8 @@ function updateAllocationsFromData(allocData){
     if(!allocData)return;
     activeAllocations={};
     for(const[k,v]of Object.entries(allocData)){
-        if(v.active)activeAllocations[k]={amount:v.amount,coin:v.coin||'SOL',status:'active',pnl:v.pnl||0,trades:v.trades||0,last_tx:v.last_tx||'',sim_pnl_pct:v.sim_pnl_pct||0,last_trade_info:v.last_trade_info||null,trade_history:v.trade_history||[]};
+        if(v.active&&!pendingDeallocations.has(k))activeAllocations[k]={amount:v.amount,coin:v.coin||'SOL',status:'active',pnl:v.pnl||0,trades:v.trades||0,last_tx:v.last_tx||'',sim_pnl_pct:v.sim_pnl_pct||0,last_trade_info:v.last_trade_info||null,trade_history:v.trade_history||[]};
+        if(!v.active)pendingDeallocations.delete(k);
     }
     renderAllocations();
     renderRealModeSection();
@@ -2035,8 +2039,27 @@ class DashboardServer:
             data = await request.json()
             key = data.get("strategy", "")
             if hasattr(self.bot, 'strategies'):
-                ok = self.bot.strategies.deallocate_strategy(key)
-                return web.json_response({"ok": ok, "strategy": key})
+                alloc = self.bot.strategies.get_allocation(key)
+                if alloc:
+                    pnl = alloc.get("pnl", 0)
+                    trades = alloc.get("trades", 0)
+                    # Cash-out: converte USDC restante de volta para SOL
+                    if hasattr(self.bot, '_cashout_usdc_to_sol'):
+                        await self.bot._cashout_usdc_to_sol(key, alloc)
+                    self.bot.strategies.deallocate_strategy(key)
+                    logger.info(f"Desalocacao: {key} | {trades} trades | PNL: ${pnl:+.4f}")
+                    if hasattr(self.bot, 'send_message'):
+                        await self.bot.send_message(
+                            f"\U0001f6d1 *MODO REAL ENCERRADO* - {key}\n"
+                            f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
+                            f"\U0001f4ca Trades: {trades}\n"
+                            f"{'\U0001f7e2' if pnl >= 0 else '\U0001f534'} P&L Final: ${pnl:+.4f}\n"
+                            f"\U0001f4b0 USDC convertido de volta para SOL\n"
+                            f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501"
+                        )
+                    return web.json_response({"ok": True, "strategy": key})
+                else:
+                    return web.json_response({"error": "strategy not allocated"}, status=400)
             return web.json_response({"error": "strategies not available"}, status=500)
         except Exception as e:
             return web.json_response({"error": str(e)}, status=400)
