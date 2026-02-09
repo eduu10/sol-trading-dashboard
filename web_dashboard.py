@@ -1254,22 +1254,25 @@ async function allocateStrategy(){
     btn.disabled=false;btn.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><polygon points="5,3 19,12 5,21"/></svg> Play';
 }
 async function deallocateStrategy(key){
-    const a=activeAllocations[key];
-    const nameMap={sniper:'Sniping Pump.fun',memecoin:'Meme Coins',arbitrage:'Arbitragem DEX',scalping:'Scalping Tokens',leverage:'Leverage Trading'};
-    const pnl=a?a.pnl||0:0;
-    const trades=a?a.trades||0:0;
-    const pnlStr=pnl>=0?'+$'+pnl.toFixed(4):'-$'+Math.abs(pnl).toFixed(4);
-    if(!confirm(`Parar MODO REAL para ${nameMap[key]||key}?\n\nTrades: ${trades}\nP&L: ${pnlStr}\n\nO USDC sera convertido de volta para SOL.`))return;
     try{
+        const a=activeAllocations[key]||{};
+        const nameMap={sniper:'Sniping Pump.fun',memecoin:'Meme Coins',arbitrage:'Arbitragem DEX',scalping:'Scalping Tokens',leverage:'Leverage Trading'};
+        const pnl=a.pnl||0;
+        const trades=a.trades||0;
+        const pnlStr=pnl>=0?'+$'+pnl.toFixed(4):'-$'+Math.abs(pnl).toFixed(4);
+        if(!confirm('Parar MODO REAL para '+(nameMap[key]||key)+'?\n\nTrades: '+trades+'\nP&L: '+pnlStr+'\n\nO USDC sera convertido de volta para SOL.'))return;
         const resp=await fetch('/api/deallocate-strategy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:key})});
-        const data=await resp.json();
-        if(data.ok){
-            alert(`${nameMap[key]||key} encerrado!\n\nTrades: ${trades}\nP&L Final: ${pnlStr}\n\nO bot convertera o USDC restante para SOL.`);
+        if(resp.status===401){window.location.href='/login';return;}
+        const result=await resp.json();
+        if(result.ok){
+            alert((nameMap[key]||key)+' encerrado!\n\nTrades: '+trades+'\nP&L Final: '+pnlStr+'\n\nO bot convertera o USDC restante para SOL.');
             delete activeAllocations[key];
             renderAllocations();
             renderRealModeSection();
+        }else{
+            alert('Erro ao parar: '+(result.error||'desconhecido'));
         }
-    }catch(e){alert('Erro: '+e);}
+    }catch(e){alert('Erro de conexao: '+e.message);}
 }
 function renderAllocations(){
     const container=document.getElementById('alloc-active-list');
