@@ -993,13 +993,69 @@ class TelegramBot:
                         logger.info(f"Alocacao real: ${amount:.2f} {coin} -> {key}")
                 elif action == "deallocate_strategy":
                     key = cmd.get("strategy", "")
-                    if self.strategies.deallocate_strategy(key):
-                        logger.info(f"Desalocacao: {key}")
+                    alloc = self.strategies.get_allocation(key)
+                    if alloc:
+                        pnl = alloc.get("pnl", 0)
+                        trades = alloc.get("trades", 0)
+                        # Cash-out: converte USDC restante de volta para SOL
+                        await self._cashout_usdc_to_sol(key, alloc)
+                        self.strategies.deallocate_strategy(key)
+                        logger.info(
+                            f"Desalocacao: {key} | {trades} trades | PNL: ${pnl:+.4f}"
+                        )
+                        await self.send_message(
+                            f"🛑 *MODO REAL ENCERRADO* - {key}\n"
+                            f"━━━━━━━━━━━━━━━━━━━━\n"
+                            f"📊 Trades: {trades}\n"
+                            f"{'🟢' if pnl >= 0 else '🔴'} P&L Final: ${pnl:+.4f}\n"
+                            f"💰 USDC convertido de volta para SOL\n"
+                            f"━━━━━━━━━━━━━━━━━━━━"
+                        )
                 elif action == "save_settings":
                     self._apply_settings(cmd)
                     self._settings_applied = True
         except Exception as e:
             logger.debug(f"Cloud push prep error: {e}")
+
+    # --------------------------------------------------------
+    # CASH-OUT: converte USDC de volta para SOL ao parar modo real
+    # --------------------------------------------------------
+    async def _cashout_usdc_to_sol(self, key: str, alloc: dict):
+        """Converte USDC restante de volta para SOL na carteira."""
+        if config.PAPER_TRADING:
+            return
+        try:
+            # Atualiza saldo USDC
+            if self.wallet:
+                await self.wallet.update_balances()
+                usdc_bal = self.wallet.last_usdc_balance
+            else:
+                usdc_bal = 0
+
+            if usdc_bal < 0.001:
+                logger.info(f"[CASH-OUT] {key}: sem USDC para converter (${usdc_bal:.4f})")
+                return
+
+            usdc_mint = config.TOKENS["USDC"]
+            sol_mint = config.TOKENS["SOL"]
+            usdc_lamports = int(usdc_bal * (10 ** 6))
+
+            logger.info(f"[CASH-OUT] {key}: convertendo ${usdc_bal:.4f} USDC -> SOL")
+            quote = await self.executor.get_quote(usdc_mint, sol_mint, usdc_lamports)
+            if not quote:
+                logger.warning(f"[CASH-OUT] {key}: sem quote USDC->SOL")
+                return
+
+            tx = await self.executor.execute_swap(quote)
+            if tx:
+                sol_received = int(quote.get("outAmount", 0)) / (10 ** 9)
+                logger.info(
+                    f"[CASH-OUT] {key}: ${usdc_bal:.4f} USDC -> {sol_received:.6f} SOL | TX: {tx}"
+                )
+            else:
+                logger.warning(f"[CASH-OUT] {key}: falha no swap USDC->SOL")
+        except Exception as e:
+            logger.error(f"[CASH-OUT] {key}: erro: {e}")
 
     # --------------------------------------------------------
     # CONFIGURACOES VIA DASHBOARD

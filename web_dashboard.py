@@ -1254,11 +1254,21 @@ async function allocateStrategy(){
     btn.disabled=false;btn.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><polygon points="5,3 19,12 5,21"/></svg> Play';
 }
 async function deallocateStrategy(key){
-    if(!confirm('Parar trades reais para '+key+'? Posicoes abertas serao fechadas.'))return;
+    const a=activeAllocations[key];
+    const nameMap={sniper:'Sniping Pump.fun',memecoin:'Meme Coins',arbitrage:'Arbitragem DEX',scalping:'Scalping Tokens',leverage:'Leverage Trading'};
+    const pnl=a?a.pnl||0:0;
+    const trades=a?a.trades||0:0;
+    const pnlStr=pnl>=0?'+$'+pnl.toFixed(4):'-$'+Math.abs(pnl).toFixed(4);
+    if(!confirm(`Parar MODO REAL para ${nameMap[key]||key}?\n\nTrades: ${trades}\nP&L: ${pnlStr}\n\nO USDC sera convertido de volta para SOL.`))return;
     try{
         const resp=await fetch('/api/deallocate-strategy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:key})});
         const data=await resp.json();
-        if(data.ok){delete activeAllocations[key];renderAllocations();}
+        if(data.ok){
+            alert(`${nameMap[key]||key} encerrado!\n\nTrades: ${trades}\nP&L Final: ${pnlStr}\n\nO bot convertera o USDC restante para SOL.`);
+            delete activeAllocations[key];
+            renderAllocations();
+            renderRealModeSection();
+        }
     }catch(e){alert('Erro: '+e);}
 }
 function renderAllocations(){
