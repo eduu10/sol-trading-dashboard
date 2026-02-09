@@ -738,6 +738,13 @@ class TelegramBot:
             else:
                 await self.send_message("❌ Erro ao executar trade. Verifique os logs.")
 
+        # MODO REAL: verifica posicoes abertas (TP/SL/timeout) a cada ciclo
+        if not config.PAPER_TRADING:
+            try:
+                await self._check_open_real_positions(current_price)
+            except Exception as e:
+                logger.error(f"Real position check error: {e}", exc_info=True)
+
         # Snapshot trade counts ANTES da simulacao
         before_counts = self.strategies.snapshot_trade_counts()
 
@@ -817,26 +824,31 @@ class TelegramBot:
                 sim_pnl_pct = sig["sim_pnl_pct"]
                 trade_id = sig["trade_id"]
 
+                # Config de hold da estrategia
+                hold_cfg = self.strategies.STRATEGY_HOLD_CONFIG.get(strat_key, {})
+                is_instant = hold_cfg.get("instant", False)
+
+                # Nao empilhar: pula se ja tem posicao aberta
+                if not is_instant and self.strategies.has_open_position(strat_key):
+                    logger.info(f"[MODO REAL] {strat_key}: ja tem posicao aberta, ignorando sinal")
+                    continue
+
                 logger.info(
-                    f"[MODO REAL] Executando trade real: {strat_key} "
-                    f"${amount_usd:.2f} {coin} | dir={direction}"
+                    f"[MODO REAL] Executando trade: {strat_key} "
+                    f"${amount_usd:.2f} {coin} | dir={direction} | "
+                    f"{'instant' if is_instant else 'hold'}"
                 )
 
                 # Resolve mint addresses
                 coin_mint = config.TOKENS.get(coin, config.TOKENS["SOL"])
                 usdc_mint = config.TOKENS["USDC"]
 
-                # Decimals: USDC=6, SOL=9, outros=variavel
                 decimals = {"SOL": 9, "USDC": 6, "USDT": 6, "WBTC": 8, "JUP": 6, "BONK": 5}
                 coin_decimals = decimals.get(coin, 9)
 
-                real_pnl = 0.0
-                tx_buy = None
-                tx_sell = None
-
                 try:
                     # === PASSO 1: Compra (USDC -> Coin) ===
-                    buy_amount_lamports = int(amount_usd * (10 ** 6))  # USDC has 6 decimals
+                    buy_amount_lamports = int(amount_usd * (10 ** 6))
                     buy_quote = await self.executor.get_quote(
                         usdc_mint, coin_mint, buy_amount_lamports
                     )
@@ -850,85 +862,78 @@ class TelegramBot:
                         continue
 
                     coins_received = int(buy_quote.get("outAmount", 0))
+                    entry_price = amount_usd / (coins_received / (10 ** coin_decimals)) if coins_received > 0 else 0
+
                     logger.info(
                         f"[MODO REAL] {strat_key}: COMPROU {coins_received} {coin} "
                         f"(${amount_usd:.2f} USDC) | TX: {tx_buy}"
                     )
 
-                    # === PASSO 2: Vende imediatamente (Coin -> USDC) ===
-                    sell_quote = await self.executor.get_quote(
-                        coin_mint, usdc_mint, coins_received
-                    )
-                    if not sell_quote:
-                        logger.warning(
-                            f"[MODO REAL] {strat_key}: sem quote para venda! "
-                            f"Posicao aberta: {coins_received} {coin}"
+                    if is_instant:
+                        # === ARBITRAGE: BUY + SELL instantaneo ===
+                        sell_quote = await self.executor.get_quote(
+                            coin_mint, usdc_mint, coins_received
                         )
-                        # Registra trade parcial (so compra)
+                        tx_sell = None
+                        if sell_quote:
+                            tx_sell = await self.executor.execute_swap(sell_quote)
+
+                        if tx_sell:
+                            usdc_received = int(sell_quote.get("outAmount", 0)) / (10 ** 6)
+                            real_pnl = round(usdc_received - amount_usd, 4)
+                            final_tx = tx_sell
+                        else:
+                            real_pnl = 0.0
+                            final_tx = tx_buy
+
                         self.strategies.update_allocation_after_trade(
-                            strat_key, tx_buy, 0.0,
-                            tx_buy=tx_buy, tx_sell="", amount_usd=amount_usd,
-                            coin=coin, direction=direction, sim_pnl_pct=sim_pnl_pct
+                            strat_key, final_tx, real_pnl,
+                            tx_buy=tx_buy, tx_sell=tx_sell or "",
+                            amount_usd=amount_usd, coin=coin,
+                            direction=direction, sim_pnl_pct=sim_pnl_pct
+                        )
+                        self.strategies.mark_trade_executed(strat_key, trade_id, final_tx)
+
+                        pnl_emoji = "🟢" if real_pnl >= 0 else "🔴"
+                        await self.send_message(
+                            f"💰 *MODO REAL* - {strat_key} (instant)\n"
+                            f"━━━━━━━━━━━━━━━━━━━━\n"
+                            f"📦 Capital: ${amount_usd:.2f} {coin}\n"
+                            f"{pnl_emoji} PNL: ${real_pnl:+.4f}\n"
+                            f"🔗 TX: `{final_tx}`\n"
+                            f"━━━━━━━━━━━━━━━━━━━━"
+                        )
+                    else:
+                        # === HOLD: so compra, monitora TP/SL nos proximos ciclos ===
+                        self.strategies.open_real_position(
+                            strategy=strat_key, coin=coin, coin_mint=coin_mint,
+                            amount_usd=amount_usd, coins_received=coins_received,
+                            coin_decimals=coin_decimals,
+                            entry_price_per_coin=entry_price,
+                            tx_buy=tx_buy, direction=direction,
+                            trade_id=trade_id, sim_pnl_pct=sim_pnl_pct,
                         )
                         self.strategies.mark_trade_executed(strat_key, trade_id, tx_buy)
-                        continue
 
-                    tx_sell = await self.executor.execute_swap(sell_quote)
-                    if not tx_sell:
-                        logger.warning(
-                            f"[MODO REAL] {strat_key}: falha na venda! "
-                            f"Posicao aberta: {coins_received} {coin}"
+                        tp = hold_cfg.get("tp_pct", 0)
+                        sl = hold_cfg.get("sl_pct", 0)
+                        max_h = hold_cfg.get("max_hold_s", 0)
+                        hold_str = f"{max_h}s" if max_h < 120 else f"{max_h // 60}min" if max_h < 7200 else f"{max_h // 3600}h"
+
+                        await self.send_message(
+                            f"📈 *MODO REAL - POSICAO ABERTA*\n"
+                            f"━━━━━━━━━━━━━━━━━━━━\n"
+                            f"Estrategia: {strat_key}\n"
+                            f"📦 Capital: ${amount_usd:.2f} {coin}\n"
+                            f"🎯 TP: +{tp}% | 🛑 SL: -{sl}%\n"
+                            f"⏰ Max Hold: {hold_str}\n"
+                            f"🔗 Buy TX: `{tx_buy}`\n"
+                            f"━━━━━━━━━━━━━━━━━━━━"
                         )
-                        self.strategies.update_allocation_after_trade(
-                            strat_key, tx_buy, 0.0,
-                            tx_buy=tx_buy, tx_sell="", amount_usd=amount_usd,
-                            coin=coin, direction=direction, sim_pnl_pct=sim_pnl_pct
-                        )
-                        self.strategies.mark_trade_executed(strat_key, trade_id, tx_buy)
-                        continue
-
-                    usdc_received = int(sell_quote.get("outAmount", 0)) / (10 ** 6)
-                    real_pnl = round(usdc_received - amount_usd, 4)
-
-                    logger.info(
-                        f"[MODO REAL] {strat_key}: VENDEU → ${usdc_received:.4f} USDC | "
-                        f"PNL: ${real_pnl:+.4f} | TX: {tx_sell}"
-                    )
 
                 except Exception as ex:
                     logger.error(f"[MODO REAL] {strat_key}: erro no swap: {ex}")
-                    if tx_buy:
-                        self.strategies.update_allocation_after_trade(
-                            strat_key, tx_buy, 0.0,
-                            tx_buy=tx_buy or "", tx_sell="", amount_usd=amount_usd,
-                            coin=coin, direction=direction, sim_pnl_pct=sim_pnl_pct
-                        )
                     continue
-
-                # Atualiza alocacao com resultado real
-                final_tx = tx_sell or tx_buy or "ERROR"
-                self.strategies.update_allocation_after_trade(
-                    strat_key, final_tx, real_pnl,
-                    tx_buy=tx_buy or "", tx_sell=tx_sell or "",
-                    amount_usd=amount_usd, coin=coin,
-                    direction=direction, sim_pnl_pct=sim_pnl_pct
-                )
-                self.strategies.mark_trade_executed(strat_key, trade_id, final_tx)
-
-                # Notificacao Telegram
-                trade_num = self.strategies.allocations.get(strat_key, {}).get("trades", 0)
-                pnl_emoji = "🟢" if real_pnl >= 0 else "🔴"
-                await self.send_message(
-                    f"💰 *MODO REAL* - {strat_key}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"Trade #{trade_num} executado!\n"
-                    f"📦 Capital: ${amount_usd:.2f} {coin}\n"
-                    f"{pnl_emoji} PNL Real: ${real_pnl:+.4f}\n"
-                    f"📊 PNL Sim: {sim_pnl_pct:+.1f}%\n"
-                    f"🔗 Buy TX: `{tx_buy}`\n"
-                    f"🔗 Sell TX: `{tx_sell}`\n"
-                    f"━━━━━━━━━━━━━━━━━━━━"
-                )
 
         except Exception as e:
             logger.error(f"Real trade execution error: {e}", exc_info=True)
@@ -994,6 +999,7 @@ class TelegramBot:
                 "strategies": self.strategies.get_all_dashboard_data(),
                 "wallet": wallet_data,
                 "allocations": self.strategies.get_all_allocations(),
+                "real_positions": self.strategies.get_real_positions_dashboard(),
                 "pk_mask": (config.SOLANA_PRIVATE_KEY[:4] + "..." + config.SOLANA_PRIVATE_KEY[-4:]) if len(config.SOLANA_PRIVATE_KEY) > 8 else "",
                 "settings_applied": getattr(self, '_settings_applied', False),
             }
@@ -1036,6 +1042,88 @@ class TelegramBot:
                     self._settings_applied = True
         except Exception as e:
             logger.debug(f"Cloud push prep error: {e}")
+
+    # --------------------------------------------------------
+    # MODO REAL: monitora posicoes abertas (TP/SL/timeout)
+    # --------------------------------------------------------
+    async def _check_open_real_positions(self, current_price: float):
+        """Verifica posicoes reais abertas e fecha quando TP/SL/timeout."""
+        open_positions = self.strategies.get_open_real_positions()
+        if not open_positions:
+            return
+
+        usdc_mint = config.TOKENS["USDC"]
+        current_values = {}
+        cached_quotes = {}
+
+        # Passo 1: Checa preco atual de cada posicao via get_quote (READ-ONLY)
+        for pos in open_positions:
+            coin_mint = pos["coin_mint"]
+            coins_held = pos["coins_received"]
+            try:
+                sell_quote = await self.executor.get_quote(
+                    coin_mint, usdc_mint, coins_held
+                )
+                if sell_quote:
+                    value_usd = int(sell_quote.get("outAmount", 0)) / (10 ** 6)
+                    current_values[pos["trade_id"]] = value_usd
+                    cached_quotes[pos["trade_id"]] = sell_quote
+            except Exception as e:
+                logger.debug(f"[MODO REAL] Position check error {pos['strategy']}: {e}")
+
+        # Passo 2: Verifica TP/SL/timeout
+        to_close = self.strategies.check_real_positions_tp_sl(current_values)
+
+        # Passo 3: Executa venda para posicoes que atingiram condicao
+        for pos, reason in to_close:
+            strat_key = pos["strategy"]
+            try:
+                quote = cached_quotes.get(pos["trade_id"])
+                if not quote:
+                    quote = await self.executor.get_quote(
+                        pos["coin_mint"], usdc_mint, pos["coins_received"]
+                    )
+                if not quote:
+                    logger.warning(f"[MODO REAL] {strat_key}: sem quote para fechar ({reason})")
+                    continue
+
+                tx_sell = await self.executor.execute_swap(quote)
+                if not tx_sell:
+                    logger.warning(f"[MODO REAL] {strat_key}: falha ao fechar ({reason})")
+                    continue
+
+                close_value = int(quote.get("outAmount", 0)) / (10 ** 6)
+                real_pnl = self.strategies.close_real_position(pos, tx_sell, close_value, reason)
+
+                hold_time = round(time.time() - pos["opened_at"])
+                hold_str = f"{hold_time}s" if hold_time < 120 else f"{hold_time // 60}min"
+
+                reason_labels = {"tp": "TAKE PROFIT", "sl": "STOP LOSS", "timeout": "TIMEOUT",
+                                 "trailing": "TRAILING STOP", "liquidated": "LIQUIDADO"}
+                reason_emojis = {"tp": "🎯", "sl": "🛑", "timeout": "⏰",
+                                 "trailing": "📉", "liquidated": "💥"}
+                pnl_emoji = "🟢" if real_pnl >= 0 else "🔴"
+
+                await self.send_message(
+                    f"{reason_emojis.get(reason, '📊')} "
+                    f"*MODO REAL - {reason_labels.get(reason, reason.upper())}*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"Estrategia: {strat_key}\n"
+                    f"Hold: {hold_str}\n"
+                    f"📦 Capital: ${pos['amount_usd']:.2f}\n"
+                    f"💰 Retorno: ${close_value:.2f}\n"
+                    f"{pnl_emoji} PNL: ${real_pnl:+.4f}\n"
+                    f"🔗 Sell TX: `{tx_sell}`\n"
+                    f"━━━━━━━━━━━━━━━━━━━━"
+                )
+
+                logger.info(
+                    f"[MODO REAL] {strat_key}: FECHOU ({reason}) | "
+                    f"PNL: ${real_pnl:+.4f} | Hold: {hold_str} | TX: {tx_sell}"
+                )
+
+            except Exception as e:
+                logger.error(f"[MODO REAL] {strat_key}: erro ao fechar: {e}")
 
     # --------------------------------------------------------
     # CASH-OUT: converte USDC de volta para SOL ao parar modo real

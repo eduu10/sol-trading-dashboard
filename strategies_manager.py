@@ -25,6 +25,50 @@ class StrategiesManager:
 
     STRATEGY_KEYS = ["sniper", "memecoin", "arbitrage", "scalping", "leverage"]
 
+    # TP/SL/Hold config para MODO REAL por estrategia
+    STRATEGY_HOLD_CONFIG = {
+        "sniper": {
+            "tp_pct": 100.0,
+            "sl_pct": 50.0,
+            "max_hold_s": 300,
+            "trailing_pct": 0,
+            "leverage": 1,
+            "instant": False,
+        },
+        "memecoin": {
+            "tp_pct": 30.0,
+            "sl_pct": 15.0,
+            "max_hold_s": 3600,
+            "trailing_pct": 8.0,
+            "leverage": 1,
+            "instant": False,
+        },
+        "arbitrage": {
+            "tp_pct": 0,
+            "sl_pct": 0,
+            "max_hold_s": 0,
+            "trailing_pct": 0,
+            "leverage": 1,
+            "instant": True,
+        },
+        "scalping": {
+            "tp_pct": 0.5,
+            "sl_pct": 0.3,
+            "max_hold_s": 300,
+            "trailing_pct": 0.15,
+            "leverage": 1,
+            "instant": False,
+        },
+        "leverage": {
+            "tp_pct": 10.0,
+            "sl_pct": 5.0,
+            "max_hold_s": 172800,
+            "trailing_pct": 0,
+            "leverage": 5,
+            "instant": False,
+        },
+    }
+
     def __init__(self):
         self.sniper = SnipingStrategy()
         self.memecoin = MemeCoinStrategy()
@@ -47,6 +91,10 @@ class StrategiesManager:
         # {key: {"amount": float, "active": bool, "allocated_at": float}}
         self.allocations: Dict[str, Dict] = {}
         self._load_allocations()
+
+        # Posicoes reais abertas (MODO REAL com hold)
+        self.real_positions: List[Dict] = []
+        self._load_real_positions()
 
     def toggle_strategy(self, key: str) -> bool:
         """Alterna pausa de uma estrategia. Retorna novo estado (True=pausado)."""
@@ -112,6 +160,196 @@ class StrategiesManager:
         """Persiste alocacoes em disco."""
         with open("allocations.json", "w") as f:
             json.dump(self.allocations, f, indent=2)
+
+    # ---- Posicoes reais abertas (MODO REAL hold) ----
+
+    def _load_real_positions(self):
+        """Carrega posicoes reais abertas do disco."""
+        try:
+            with open("real_positions.json") as f:
+                self.real_positions = json.load(f)
+                open_count = sum(1 for p in self.real_positions if p.get("status") == "open")
+                if open_count:
+                    logger.info(f"Loaded {open_count} open real positions")
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.real_positions = []
+
+    def _save_real_positions(self):
+        """Persiste posicoes reais em disco."""
+        # Mantem apenas abertas + ultimas 50 fechadas
+        open_pos = [p for p in self.real_positions if p.get("status") == "open"]
+        closed = [p for p in self.real_positions if p.get("status") != "open"]
+        self.real_positions = open_pos + closed[-50:]
+        with open("real_positions.json", "w") as f:
+            json.dump(self.real_positions, f, indent=2)
+
+    def open_real_position(self, strategy: str, coin: str, coin_mint: str,
+                           amount_usd: float, coins_received: int,
+                           coin_decimals: int, entry_price_per_coin: float,
+                           tx_buy: str, direction: str, trade_id: str,
+                           sim_pnl_pct: float) -> dict:
+        """Registra posicao aberta apos BUY."""
+        hold_cfg = self.STRATEGY_HOLD_CONFIG.get(strategy, {})
+        pos = {
+            "strategy": strategy,
+            "coin": coin,
+            "coin_mint": coin_mint,
+            "amount_usd": amount_usd,
+            "coins_received": coins_received,
+            "coin_decimals": coin_decimals,
+            "entry_price_usd": entry_price_per_coin,
+            "tx_buy": tx_buy,
+            "tx_sell": "",
+            "direction": direction,
+            "trade_id": trade_id,
+            "sim_pnl_pct": sim_pnl_pct,
+            "opened_at": time.time(),
+            "tp_pct": hold_cfg.get("tp_pct", 10.0),
+            "sl_pct": hold_cfg.get("sl_pct", 5.0),
+            "max_hold_s": hold_cfg.get("max_hold_s", 300),
+            "trailing_pct": hold_cfg.get("trailing_pct", 0),
+            "leverage": hold_cfg.get("leverage", 1),
+            "highest_value_usd": amount_usd,
+            "status": "open",
+            "unrealized_pnl_usd": 0.0,
+            "unrealized_pnl_pct": 0.0,
+            "current_value_usd": amount_usd,
+            "last_checked": time.time(),
+        }
+        self.real_positions.append(pos)
+        self._save_real_positions()
+        logger.info(
+            f"[MODO REAL] Posicao aberta: {strategy} | ${amount_usd:.2f} {coin} | "
+            f"TP: +{pos['tp_pct']}% SL: -{pos['sl_pct']}% "
+            f"Hold: {pos['max_hold_s']}s"
+        )
+        return pos
+
+    def has_open_position(self, strategy: str) -> bool:
+        """Checa se estrategia ja tem posicao aberta (sem empilhar)."""
+        return any(
+            p["strategy"] == strategy and p["status"] == "open"
+            for p in self.real_positions
+        )
+
+    def get_open_real_positions(self) -> List[Dict]:
+        """Retorna posicoes abertas."""
+        return [p for p in self.real_positions if p["status"] == "open"]
+
+    def close_real_position(self, pos: dict, tx_sell: str,
+                            close_value_usd: float, reason: str) -> float:
+        """Fecha posicao real com resultado da venda."""
+        pos["tx_sell"] = tx_sell
+        pos["status"] = f"closed_{reason}"
+        pos["closed_at"] = time.time()
+        pos["close_value_usd"] = close_value_usd
+        real_pnl = round(close_value_usd - pos["amount_usd"], 4)
+        pos["realized_pnl_usd"] = real_pnl
+
+        # Atualiza allocation stats
+        self.update_allocation_after_trade(
+            pos["strategy"], tx_sell, real_pnl,
+            tx_buy=pos["tx_buy"], tx_sell=tx_sell,
+            amount_usd=pos["amount_usd"], coin=pos["coin"],
+            direction=pos["direction"], sim_pnl_pct=pos["sim_pnl_pct"]
+        )
+        self._save_real_positions()
+        return real_pnl
+
+    def check_real_positions_tp_sl(self, current_values: dict) -> list:
+        """
+        Verifica TP/SL/timeout/trailing/liquidacao em posicoes abertas.
+        current_values: {trade_id: current_value_usd}
+        Retorna lista de (pos, reason) para fechar.
+        """
+        to_close = []
+        now = time.time()
+
+        for pos in self.real_positions:
+            if pos["status"] != "open":
+                continue
+
+            current_val = current_values.get(pos["trade_id"])
+            if current_val is None:
+                continue
+
+            entry_usd = pos["amount_usd"]
+            lev = pos.get("leverage", 1)
+
+            # PnL calculation (leverage multiplica)
+            raw_pnl_pct = ((current_val - entry_usd) / entry_usd) * 100 if entry_usd > 0 else 0
+            effective_pnl_pct = raw_pnl_pct * lev
+
+            pos["unrealized_pnl_pct"] = round(effective_pnl_pct, 2)
+            pos["unrealized_pnl_usd"] = round((current_val - entry_usd) * lev, 4)
+            pos["current_value_usd"] = round(current_val, 4)
+            pos["last_checked"] = now
+
+            # Trailing: track highest
+            if current_val > pos.get("highest_value_usd", entry_usd):
+                pos["highest_value_usd"] = current_val
+
+            # 1. TIMEOUT
+            hold_time = now - pos["opened_at"]
+            max_hold = pos.get("max_hold_s", 0)
+            if max_hold > 0 and hold_time >= max_hold:
+                to_close.append((pos, "timeout"))
+                continue
+
+            # 2. TAKE PROFIT
+            tp = pos.get("tp_pct", 0)
+            if tp > 0 and effective_pnl_pct >= tp:
+                to_close.append((pos, "tp"))
+                continue
+
+            # 3. STOP LOSS
+            sl = pos.get("sl_pct", 0)
+            if sl > 0 and effective_pnl_pct <= -sl:
+                to_close.append((pos, "sl"))
+                continue
+
+            # 4. LIQUIDACAO (leverage: perde > 90% da margem)
+            if lev > 1 and effective_pnl_pct <= -90.0:
+                to_close.append((pos, "liquidated"))
+                continue
+
+            # 5. TRAILING STOP
+            trailing = pos.get("trailing_pct", 0)
+            if trailing > 0 and current_val > entry_usd:
+                highest = pos.get("highest_value_usd", entry_usd)
+                drop_pct = ((highest - current_val) / highest) * 100
+                if drop_pct >= trailing:
+                    to_close.append((pos, "trailing"))
+                    continue
+
+        self._save_real_positions()
+        return to_close
+
+    def get_real_positions_dashboard(self) -> list:
+        """Retorna posicoes abertas para o cloud dashboard."""
+        return [
+            {
+                "strategy": p["strategy"],
+                "coin": p["coin"],
+                "amount_usd": p["amount_usd"],
+                "current_value_usd": p.get("current_value_usd", p["amount_usd"]),
+                "unrealized_pnl_usd": p.get("unrealized_pnl_usd", 0),
+                "unrealized_pnl_pct": p.get("unrealized_pnl_pct", 0),
+                "tp_pct": p.get("tp_pct", 0),
+                "sl_pct": p.get("sl_pct", 0),
+                "trailing_pct": p.get("trailing_pct", 0),
+                "max_hold_s": p.get("max_hold_s", 0),
+                "hold_time_s": round(time.time() - p["opened_at"]),
+                "tx_buy": p["tx_buy"],
+                "direction": p["direction"],
+                "status": p["status"],
+                "opened_at": p["opened_at"],
+            }
+            for p in self.real_positions
+            if p["status"] == "open"
+        ]
+
+    # ---- Alocacao de capital real ----
 
     def allocate_strategy(self, key: str, amount: float, coin: str = "SOL") -> bool:
         """Aloca capital real para uma estrategia."""
