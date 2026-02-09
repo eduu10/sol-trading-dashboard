@@ -672,6 +672,61 @@ def get_dashboard_html():
         </div>
     </header>
     <main class="main">
+        <!-- ===== CARTEIRA PHANTOM ===== -->
+        <div class="card wallet-card" id="wallet-card" style="display:none">
+            <div class="card-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="16" cy="12" r="2"/><path d="M2 10h4"/></svg> Carteira Phantom</div>
+            <div class="wallet-inner">
+                <div class="wallet-status"><div class="wallet-dot" id="wallet-dot"></div><span class="wallet-addr" id="wallet-addr">----...----</span></div>
+                <div class="wallet-balances">
+                    <div class="wallet-bal"><div class="wallet-bal-label">SOL</div><div class="wallet-bal-value" id="wallet-sol" style="color:var(--purple)">0.0000</div><div class="wallet-bal-sub" id="wallet-sol-usd">~$0.00</div></div>
+                    <div class="wallet-bal"><div class="wallet-bal-label">USDC</div><div class="wallet-bal-value" id="wallet-usdc" style="color:var(--green)">$0.00</div></div>
+                    <div class="wallet-bal"><div class="wallet-bal-label">Total</div><div class="wallet-bal-value" id="wallet-total" style="color:var(--yellow)">$0.00</div></div>
+                </div>
+            </div>
+            <div class="wallet-allocate" id="wallet-allocate">
+                <div class="wallet-alloc-title">Alocar Capital Real</div>
+                <div class="wallet-alloc-form">
+                    <select id="alloc-strategy" class="alloc-select">
+                        <option value="">Estrategia...</option>
+                        <option value="sniper">Sniping Pump.fun</option>
+                        <option value="memecoin">Meme Coins</option>
+                        <option value="arbitrage">Arbitragem DEX</option>
+                        <option value="scalping">Scalping Tokens</option>
+                        <option value="leverage">Leverage Trading</option>
+                    </select>
+                    <select id="alloc-coin" class="alloc-select" style="min-width:120px">
+                        <option value="SOL">SOL</option>
+                        <option value="USDC">USDC</option>
+                        <option value="USDT">USDT</option>
+                        <option value="JUP">JUP</option>
+                        <option value="BONK">BONK</option>
+                        <option value="WBTC">WBTC</option>
+                    </select>
+                    <div class="alloc-amount-wrap">
+                        <span class="alloc-currency">$</span>
+                        <input type="number" id="alloc-amount" class="alloc-input" placeholder="0.00" min="0.01" step="0.01"/>
+                    </div>
+                    <button class="alloc-play-btn" id="alloc-play-btn" onclick="allocateStrategy()">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><polygon points="5,3 19,12 5,21"/></svg>
+                        Play
+                    </button>
+                </div>
+                <div class="wallet-alloc-active" id="alloc-active-list"></div>
+                <div class="wallet-alloc-warning">Trades reais via Jupiter DEX. Risco de perda.</div>
+            </div>
+        </div>
+        <!-- ===== MODO REAL ===== -->
+        <div class="strategies-section" id="real-mode-section" style="display:none">
+            <div class="strategies-title-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--green)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                <span class="strategies-title">Estrategias de Day Trade</span>
+                <span class="strategies-subtitle" style="background:rgba(0,255,136,0.08);border-color:rgba(0,255,136,0.15);color:var(--green)">MODO REAL</span>
+            </div>
+            <div class="strategies-grid" id="real-strategies-grid">
+                <!-- Cards dinamicos para estrategias com capital real alocado -->
+            </div>
+        </div>
+        <!-- ===== FIM MODO REAL ===== -->
         <div class="card price-card">
             <div class="card-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> Preco Atual</div>
             <div class="price-main glow-green" id="price">$---.--</div>
@@ -736,49 +791,6 @@ def get_dashboard_html():
             <div class="card-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg> Historico de Analises</div>
             <div class="analysis-list" id="analysis-list">
                 <div class="analysis-empty">Aguardando analises do bot...</div>
-            </div>
-        </div>
-        <!-- ===== CARTEIRA PHANTOM ===== -->
-        <div class="card wallet-card" id="wallet-card" style="display:none">
-            <div class="card-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="16" cy="12" r="2"/><path d="M2 10h4"/></svg> Carteira Phantom</div>
-            <div class="wallet-inner">
-                <div class="wallet-status"><div class="wallet-dot" id="wallet-dot"></div><span class="wallet-addr" id="wallet-addr">----...----</span></div>
-                <div class="wallet-balances">
-                    <div class="wallet-bal"><div class="wallet-bal-label">SOL</div><div class="wallet-bal-value" id="wallet-sol" style="color:var(--purple)">0.0000</div><div class="wallet-bal-sub" id="wallet-sol-usd">~$0.00</div></div>
-                    <div class="wallet-bal"><div class="wallet-bal-label">USDC</div><div class="wallet-bal-value" id="wallet-usdc" style="color:var(--green)">$0.00</div></div>
-                    <div class="wallet-bal"><div class="wallet-bal-label">Total</div><div class="wallet-bal-value" id="wallet-total" style="color:var(--yellow)">$0.00</div></div>
-                </div>
-            </div>
-            <div class="wallet-allocate" id="wallet-allocate">
-                <div class="wallet-alloc-title">Alocar Capital Real</div>
-                <div class="wallet-alloc-form">
-                    <select id="alloc-strategy" class="alloc-select">
-                        <option value="">Estrategia...</option>
-                        <option value="sniper">Sniping Pump.fun</option>
-                        <option value="memecoin">Meme Coins</option>
-                        <option value="arbitrage">Arbitragem DEX</option>
-                        <option value="scalping">Scalping Tokens</option>
-                        <option value="leverage">Leverage Trading</option>
-                    </select>
-                    <select id="alloc-coin" class="alloc-select" style="min-width:120px">
-                        <option value="SOL">SOL</option>
-                        <option value="USDC">USDC</option>
-                        <option value="USDT">USDT</option>
-                        <option value="JUP">JUP</option>
-                        <option value="BONK">BONK</option>
-                        <option value="WBTC">WBTC</option>
-                    </select>
-                    <div class="alloc-amount-wrap">
-                        <span class="alloc-currency">$</span>
-                        <input type="number" id="alloc-amount" class="alloc-input" placeholder="0.00" min="0.01" step="0.01"/>
-                    </div>
-                    <button class="alloc-play-btn" id="alloc-play-btn" onclick="allocateStrategy()">
-                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><polygon points="5,3 19,12 5,21"/></svg>
-                        Play
-                    </button>
-                </div>
-                <div class="wallet-alloc-active" id="alloc-active-list"></div>
-                <div class="wallet-alloc-warning">Trades reais via Jupiter DEX. Risco de perda.</div>
             </div>
         </div>
         <!-- ===== 5 ESTRATEGIAS DE DAY TRADE ===== -->
@@ -982,18 +994,6 @@ def get_dashboard_html():
             </div>
         </div>
         <!-- ===== FIM ESTRATEGIAS TESTE ===== -->
-        <!-- ===== MODO REAL ===== -->
-        <div class="strategies-section" id="real-mode-section" style="display:none">
-            <div class="strategies-title-row">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--green)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                <span class="strategies-title">Estrategias de Day Trade</span>
-                <span class="strategies-subtitle" style="background:rgba(0,255,136,0.08);border-color:rgba(0,255,136,0.15);color:var(--green)">MODO REAL</span>
-            </div>
-            <div class="strategies-grid" id="real-strategies-grid">
-                <!-- Cards dinamicos para estrategias com capital real alocado -->
-            </div>
-        </div>
-        <!-- ===== FIM MODO REAL ===== -->
         <div class="card log-card">
             <div class="card-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> Terminal</div>
             <div class="log-container" id="log-container">
