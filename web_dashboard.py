@@ -77,6 +77,8 @@ def _save_persistent_state():
             "forced_inactive": list(FORCED_INACTIVE),
             "sessions": {k: v for k, v in SESSIONS.items()
                          if time.time() - v.get("created", 0) < SESSION_MAX_AGE},
+            "allocations": BOT_DATA.get("allocations"),
+            "real_positions": BOT_DATA.get("real_positions"),
         }
         with open(PERSIST_FILE, "w") as f:
             json.dump(state, f)
@@ -103,6 +105,12 @@ def _load_persistent_state():
         for k, v in saved_sessions.items():
             if time.time() - v.get("created", 0) < SESSION_MAX_AGE:
                 SESSIONS[k] = v
+        saved_allocs = state.get("allocations")
+        if saved_allocs:
+            BOT_DATA["allocations"] = saved_allocs
+        saved_rp = state.get("real_positions")
+        if saved_rp is not None:
+            BOT_DATA["real_positions"] = saved_rp
         logger.info(f"Loaded persistent state: {len(saved_sessions)} sessions, "
                      f"pending_settings={'yes' if ps else 'no'}, "
                      f"{len(cmds)} pending commands")
@@ -1314,7 +1322,7 @@ function renderAllocations(){
             </button>
         </div>`;
     }
-    container.innerHTML=html;
+    if(container.innerHTML!==html)container.innerHTML=html;
 }
 function updateAllocationsFromData(allocData){
     if(!allocData)return;
@@ -1412,7 +1420,7 @@ function renderRealModeSection(){
             </button>
         </div>`;
     }
-    grid.innerHTML=html;
+    if(grid.innerHTML!==html)grid.innerHTML=html;
 }
 function showTradeHistory(stratKey){
     const a=activeAllocations[stratKey];

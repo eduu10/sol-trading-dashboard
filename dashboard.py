@@ -1511,7 +1511,7 @@ function renderAllocations(){
             </button>
         </div>`;
     }
-    container.innerHTML=html;
+    if(container.innerHTML!==html)container.innerHTML=html;
 }
 function updateAllocationsFromData(allocData){
     if(!allocData)return;
@@ -1609,7 +1609,7 @@ function renderRealModeSection(){
             </button>
         </div>`;
     }
-    grid.innerHTML=html;
+    if(grid.innerHTML!==html)grid.innerHTML=html;
 }
 function showTradeHistory(stratKey){
     const a=activeAllocations[stratKey];
