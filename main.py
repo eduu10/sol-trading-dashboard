@@ -1002,6 +1002,7 @@ class TelegramBot:
                 "wallet": wallet_data,
                 "allocations": self.strategies.get_all_allocations(),
                 "real_positions": self.strategies.get_real_positions_dashboard(),
+                "agents": self.strategies.agent_manager.get_all_dashboard_data(),
                 "pk_mask": (config.SOLANA_PRIVATE_KEY[:4] + "..." + config.SOLANA_PRIVATE_KEY[-4:]) if len(config.SOLANA_PRIVATE_KEY) > 8 else "",
                 "settings_applied": getattr(self, '_settings_applied', False),
             }

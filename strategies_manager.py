@@ -16,6 +16,7 @@ from strategy_memecoin import MemeCoinStrategy
 from strategy_arbitrage import ArbitrageStrategy
 from strategy_scalping import ScalpingStrategy
 from strategy_leverage import LeverageStrategy
+from strategy_agents import AgentManager
 
 logger = logging.getLogger("StrategiesManager")
 
@@ -95,6 +96,9 @@ class StrategiesManager:
         # Posicoes reais abertas (MODO REAL com hold)
         self.real_positions: List[Dict] = []
         self._load_real_positions()
+
+        # Agentes adaptativos por estrategia
+        self.agent_manager = AgentManager()
 
     def toggle_strategy(self, key: str) -> bool:
         """Alterna pausa de uma estrategia. Retorna novo estado (True=pausado)."""
@@ -443,7 +447,7 @@ class StrategiesManager:
 
             trade_id = f"{key}_{int(time.time())}_{after}"
 
-            signals.append({
+            signal = {
                 "strategy": key,
                 "direction": direction,
                 "amount_raw": alloc["amount"],
@@ -452,11 +456,24 @@ class StrategiesManager:
                 "trade_info": trade_info,
                 "sim_pnl_pct": pnl_pct,
                 "sim_won": won,
-            })
+            }
+
+            # Agente avalia se deve executar
+            history = alloc.get("trade_history", [])
+            should_exec, reason = self.agent_manager.evaluate_signal(signal, history)
+            signal["agent_decision"] = reason
+
+            if not should_exec:
+                logger.info(
+                    f"[AGENTE] {key}: sinal REJEITADO — {reason}"
+                )
+                continue
+
+            signals.append(signal)
 
             logger.info(
                 f"[MODO REAL] Sinal detectado: {key} {direction} "
-                f"{alloc['amount']:.4f} {coin} | Sim: {pnl_pct:+.1f}%"
+                f"{alloc['amount']:.4f} {coin} | Sim: {pnl_pct:+.1f}% | Agente: {reason}"
             )
 
         return signals
@@ -501,6 +518,9 @@ class StrategiesManager:
             alloc["trade_history"] = alloc["trade_history"][-100:]
 
         self._save_allocations()
+
+        # Atualiza agente com novo historico
+        self.agent_manager.update_after_trade(key, alloc.get("trade_history", []), alloc)
 
     def _get_last_trade_info(self, key: str, data: Dict) -> Optional[Dict]:
         """Extrai info do ultimo trade da simulacao para mostrar no dashboard."""

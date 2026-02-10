@@ -1156,6 +1156,7 @@ function updateDashboard(data) {
     }
     if(data.allocations){updateAllocationsFromData(data.allocations);}
     if(data.real_positions!==undefined){realPositions={};for(const p of data.real_positions){realPositions[p.strategy]=p;}renderRealModeSection();}
+    if(data.agents!==undefined){agentsData={};for(const a of data.agents){agentsData[a.strategy]=a;}renderRealModeSection();}
 }
 function updateStrategies(strats){
     if(!strats)return;
@@ -1251,6 +1252,7 @@ async function toggleStrategy(key){
 // === Allocation system ===
 let activeAllocations={};
 let realPositions={};
+let agentsData={};
 const pendingDeallocations=new Set();
 function coinDecimals(c){return(c==='USDC'||c==='USDT')?2:c==='BONK'?0:c==='WBTC'?6:4;}
 function fmtCoinAmt(amt,coin){return parseFloat(amt).toFixed(coinDecimals(coin));}
@@ -1411,6 +1413,7 @@ function renderRealModeSection(){
                 ${infoHtml}
                 ${txHtml}
             </div>
+            ${(()=>{const ag=agentsData[k];if(!ag||!ag.analysis||ag.analysis.status==='sem_dados')return'';const an=ag.analysis;const confPct=Math.round((ag.confidence||0)*100);const confColor=confPct>=60?'var(--green)':confPct>=40?'var(--yellow)':'var(--red)';const wr=an.win_rate||0;const wrColor=wr>=55?'var(--green)':wr>=45?'var(--yellow)':'var(--red)';const sk=ag.streak||0;const skIcon=sk>0?'+'+sk:sk<0?sk.toString():'0';const skColor=sk>0?'var(--green)':sk<0?'var(--red)':'var(--text-muted)';return'<div style="background:rgba(138,43,226,0.06);border:1px solid rgba(138,43,226,0.15);border-radius:8px;padding:10px;margin:8px 0;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="color:var(--purple);font-weight:700;font-size:0.75em;text-transform:uppercase;letter-spacing:1px;">Agente IA</span><span style="font-size:0.75em;color:'+confColor+';font-weight:700;">'+confPct+'% conf</span></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:0.75em;"><div><span style="color:var(--text-muted);">Win Rate</span> <span style="color:'+wrColor+';">'+wr.toFixed(1)+'%</span></div><div><span style="color:var(--text-muted);">Streak</span> <span style="color:'+skColor+';">'+skIcon+'</span></div><div><span style="color:var(--text-muted);">Aprovados</span> <span style="color:var(--green);">'+(ag.approved||0)+'</span></div><div><span style="color:var(--text-muted);">Rejeitados</span> <span style="color:var(--red);">'+(ag.rejected||0)+'</span></div></div><div style="margin-top:6px;height:3px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;"><div style="height:100%;width:'+confPct+'%;background:'+confColor+';transition:width 0.3s;"></div></div></div>';})()}
             <div class="strat-stats">
                 <div class="strat-stat-row"><span class="strat-stat-label">Status</span><span class="strat-stat-value" style="color:${hasPos?'var(--green)':'var(--text-muted)'}">${hasPos?'HOLDING':'AGUARDANDO'}</span></div>
                 <div class="strat-stat-row" style="cursor:pointer;" onclick="showTradeHistory('${k}')"><span class="strat-stat-label" style="text-decoration:underline;text-underline-offset:3px;">Trades Executados</span><span class="strat-stat-value" style="display:flex;align-items:center;gap:4px;">${trades} <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span></div>
