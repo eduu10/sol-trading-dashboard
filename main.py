@@ -839,12 +839,14 @@ class TelegramBot:
                     f"{'instant' if is_instant else 'hold'}"
                 )
 
-                # Resolve mint addresses
-                coin_mint = config.TOKENS.get(coin, config.TOKENS["SOL"])
+                # Resolve mint addresses — par é sempre SOL/USDC
+                # 'coin' é a moeda alocada pelo usuario, mas o ativo traded é SOL
+                trade_coin = "SOL"
+                coin_mint = config.TOKENS["SOL"]
                 usdc_mint = config.TOKENS["USDC"]
 
                 decimals = {"SOL": 9, "USDC": 6, "USDT": 6, "WBTC": 8, "JUP": 6, "BONK": 5}
-                coin_decimals = decimals.get(coin, 9)
+                coin_decimals = decimals.get(trade_coin, 9)
 
                 try:
                     # === PASSO 1: Compra (USDC -> Coin) ===
@@ -865,7 +867,7 @@ class TelegramBot:
                     entry_price = amount_usd / (coins_received / (10 ** coin_decimals)) if coins_received > 0 else 0
 
                     logger.info(
-                        f"[MODO REAL] {strat_key}: COMPROU {coins_received} {coin} "
+                        f"[MODO REAL] {strat_key}: COMPROU {coins_received} {trade_coin} "
                         f"(${amount_usd:.2f} USDC) | TX: {tx_buy}"
                     )
 
@@ -906,7 +908,7 @@ class TelegramBot:
                     else:
                         # === HOLD: so compra, monitora TP/SL nos proximos ciclos ===
                         self.strategies.open_real_position(
-                            strategy=strat_key, coin=coin, coin_mint=coin_mint,
+                            strategy=strat_key, coin=trade_coin, coin_mint=coin_mint,
                             amount_usd=amount_usd, coins_received=coins_received,
                             coin_decimals=coin_decimals,
                             entry_price_per_coin=entry_price,
