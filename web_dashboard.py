@@ -711,6 +711,7 @@ def get_dashboard_html():
                         <option value="arbitrage">Arbitragem DEX</option>
                         <option value="scalping">Scalping Tokens</option>
                         <option value="leverage">Leverage Trading</option>
+                        <option value="whale">Whale Tracking</option>
                     </select>
                     <select id="alloc-coin" class="alloc-select" style="min-width:120px">
                         <option value="SOL">SOL</option>
@@ -1019,6 +1020,45 @@ def get_dashboard_html():
                     </div>
                     <button class="strat-toggle-btn running" id="strat-lev-btn" onclick="toggleStrategy('leverage')">Parar</button>
                 </div>
+                <!-- 6. Whale Tracking -->
+                <div class="strat-card risk-medio" id="strat-whale">
+                    <div class="strat-header">
+                        <div class="strat-name">Whale Tracking</div>
+                        <span class="strat-paused-badge">PAUSADO</span>
+                        <div class="strat-help">?
+                            <div class="strat-tooltip">
+                                <div class="strat-tooltip-title">Seguir Baleias de Crypto</div>
+                                Monitora movimentacoes de baleias (grandes holders) via Whale Alert e Solana RPC. Quando baleias compram/acumulam SOL, replica o trade com take profit rapido (5%). Filtra por volume minimo ($100k+) e confianca do sinal.
+                                <div class="strat-tooltip-tools">Ferramentas: <span>Whale Alert API, Solana RPC, Jupiter DEX</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="strat-badges">
+                        <span class="strat-badge risk-med">Risco Medio</span>
+                        <span class="strat-badge return-badge">Retorno Medio-Alto</span>
+                        <span class="strat-badge time-badge">Min a Horas</span>
+                    </div>
+                    <div class="strat-pnl neutral" id="strat-whale-pnl">$0.00</div>
+                    <div class="strat-capital">
+                        <div class="strat-cap-item"><span class="strat-cap-label">Capital</span><span class="strat-cap-value" id="strat-whale-cap" style="color:var(--yellow)">$100.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Investido</span><span class="strat-cap-value" id="strat-whale-inv">$0.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Ganhos</span><span class="strat-cap-value" id="strat-whale-gain" style="color:var(--green)">$0.00</span></div>
+                        <div class="strat-cap-item"><span class="strat-cap-label">Perdas</span><span class="strat-cap-value" id="strat-whale-loss" style="color:var(--red)">$0.00</span></div>
+                        <div class="strat-cap-item strat-cap-full"><span class="strat-cap-label">Hoje</span><span class="strat-cap-value" id="strat-whale-today">$0.00</span></div>
+                    </div>
+                    <div class="strat-stats">
+                        <div class="strat-stat-row"><span class="strat-stat-label">Trades</span><span class="strat-stat-value" id="strat-whale-trades">0</span></div>
+                        <div class="strat-stat-row"><span class="strat-stat-label">Win Rate</span><span class="strat-stat-value" id="strat-whale-wr">0%</span></div>
+                        <div class="strat-winrate-bar"><div class="strat-winrate-fill" id="strat-whale-wrbar" style="width:0%;background:var(--red)"></div></div>
+                        <div class="strat-stat-row"><span class="strat-stat-label">Sinais Detectados</span><span class="strat-stat-value" id="strat-whale-signals">0</span></div>
+                        <div class="strat-stat-row"><span class="strat-stat-label">Sinais Seguidos</span><span class="strat-stat-value" id="strat-whale-followed">0</span></div>
+                    </div>
+                    <div class="strat-recent">
+                        <div class="strat-recent-title">Ultimos Trades</div>
+                        <div id="strat-whale-recent"></div>
+                    </div>
+                    <button class="strat-toggle-btn running" id="strat-whale-btn" onclick="toggleStrategy('whale')">Parar</button>
+                </div>
             </div>
         </div>
         <!-- ===== FIM ESTRATEGIAS TESTE ===== -->
@@ -1235,12 +1275,24 @@ function updateStrategies(strats){
         setText('strat-lev-liq',s.liquidations||0);
         setRecent('strat-lev-recent',(strats.leverage.recent_positions||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.token} ${t.direction} ${t.leverage}</span><span class="strat-recent-pnl" style="color:${t.pnl_pct>=0?'var(--green)':'var(--red)'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</span></div>`);
     }
+    // 6. Whale
+    if(strats.whale){const s=strats.whale.stats||{},c=strats.whale.capital||{};
+        setPnl('strat-whale-pnl',c.pnl_usd||0,false);
+        setCap('strat-whale',c);
+        setText('strat-whale-trades',s.total_trades||0);
+        setText('strat-whale-wr',(s.win_rate||0).toFixed(0)+'%');
+        setBar('strat-whale-wrbar',s.win_rate||0);
+        setText('strat-whale-signals',s.signals_detected||0);
+        setText('strat-whale-followed',s.signals_followed||0);
+        setRecent('strat-whale-recent',(strats.whale.recent_trades||[]).slice(0,4),t=>`<div class="strat-recent-item"><span class="strat-recent-name">${t.whale} ${t.move_type}</span><span class="strat-recent-pnl" style="color:${t.pnl_pct>=0?'var(--green)':'var(--red)'}">${t.pnl_pct>=0?'+':''}${t.pnl_pct.toFixed(2)}%</span></div>`);
+    }
     // Update pause states
     if(strats.sniper)setPaused('strat-sniper','strat-sniper-btn',!!strats.sniper.paused);
     if(strats.memecoin)setPaused('strat-memecoin','strat-meme-btn',!!strats.memecoin.paused);
     if(strats.arbitrage)setPaused('strat-arbitrage','strat-arb-btn',!!strats.arbitrage.paused);
     if(strats.scalping)setPaused('strat-scalping','strat-scalp-btn',!!strats.scalping.paused);
     if(strats.leverage)setPaused('strat-leverage','strat-lev-btn',!!strats.leverage.paused);
+    if(strats.whale)setPaused('strat-whale','strat-whale-btn',!!strats.whale.paused);
 }
 function setPnl(id,val,isPct){const el=document.getElementById(id);if(!el)return;const txt=isPct?((val>=0?'+':'')+val.toFixed(1)+'%'):((val>=0?'+$':'-$')+Math.abs(val).toFixed(2));el.textContent=txt;el.className='strat-pnl '+(val>0?'profit':val<0?'loss':'neutral');}
 function setText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
@@ -1252,7 +1304,7 @@ async function toggleStrategy(key){
         const data=await resp.json();
         if(data.ok){
             // Feedback visual imediato enquanto espera o bot confirmar
-            const map={sniper:['strat-sniper','strat-sniper-btn'],memecoin:['strat-memecoin','strat-meme-btn'],arbitrage:['strat-arbitrage','strat-arb-btn'],scalping:['strat-scalping','strat-scalp-btn'],leverage:['strat-leverage','strat-lev-btn']};
+            const map={sniper:['strat-sniper','strat-sniper-btn'],memecoin:['strat-memecoin','strat-meme-btn'],arbitrage:['strat-arbitrage','strat-arb-btn'],scalping:['strat-scalping','strat-scalp-btn'],leverage:['strat-leverage','strat-lev-btn'],whale:['strat-whale','strat-whale-btn']};
             const ids=map[key];if(ids){const card=document.getElementById(ids[0]);const isPaused=card&&card.classList.contains('is-paused');
             if(card){card.classList.toggle('is-paused');}
             const btn=document.getElementById(ids[1]);if(btn){btn.textContent=isPaused?'Parar':'Continuar';btn.className='strat-toggle-btn '+(isPaused?'running':'paused');}}
@@ -1296,7 +1348,7 @@ async function allocateStrategy(){
 async function deallocateStrategy(key){
     try{
         const a=activeAllocations[key]||{};
-        const nameMap={sniper:'Sniping Pump.fun',memecoin:'Meme Coins',arbitrage:'Arbitragem DEX',scalping:'Scalping Tokens',leverage:'Leverage Trading'};
+        const nameMap={sniper:'Sniping Pump.fun',memecoin:'Meme Coins',arbitrage:'Arbitragem DEX',scalping:'Scalping Tokens',leverage:'Leverage Trading',whale:'Whale Tracking'};
         const pnl=a.pnl||0;
         const trades=a.trades||0;
         const pnlStr=pnl>=0?'+$'+pnl.toFixed(4):'-$'+Math.abs(pnl).toFixed(4);
@@ -1321,7 +1373,7 @@ function renderAllocations(){
     if(!container)return;
     const keys=Object.keys(activeAllocations);
     if(keys.length===0){container.innerHTML='';return;}
-    const nameMap={sniper:'Sniping Pump.fun',memecoin:'Meme Coins',arbitrage:'Arbitragem DEX',scalping:'Scalping Tokens',leverage:'Leverage Trading'};
+    const nameMap={sniper:'Sniping Pump.fun',memecoin:'Meme Coins',arbitrage:'Arbitragem DEX',scalping:'Scalping Tokens',leverage:'Leverage Trading',whale:'Whale Tracking'};
     let html='';
     for(const k of keys){
         const a=activeAllocations[k];
@@ -1356,8 +1408,8 @@ function renderRealModeSection(){
     const keys=Object.keys(activeAllocations);
     if(keys.length===0){section.style.display='none';return;}
     section.style.display='';
-    const nameMap={sniper:'Sniping Pump.fun',memecoin:'Meme Coins',arbitrage:'Arbitragem DEX',scalping:'Scalping Tokens',leverage:'Leverage Trading'};
-    const riskMap={sniper:'risk-alto',memecoin:'risk-alto',arbitrage:'risk-medio',scalping:'risk-medio-baixo',leverage:'risk-muito-alto'};
+    const nameMap={sniper:'Sniping Pump.fun',memecoin:'Meme Coins',arbitrage:'Arbitragem DEX',scalping:'Scalping Tokens',leverage:'Leverage Trading',whale:'Whale Tracking'};
+    const riskMap={sniper:'risk-alto',memecoin:'risk-alto',arbitrage:'risk-medio',scalping:'risk-medio-baixo',leverage:'risk-muito-alto',whale:'risk-medio'};
     let html='';
     for(const k of keys){
         const a=activeAllocations[k];
@@ -1442,7 +1494,7 @@ function renderAgentsSection(){
     const keys=Object.keys(agentsData);
     if(keys.length===0){section.style.display='none';return;}
     section.style.display='';
-    const nameMap={sniper:'Sniping Pump.fun',memecoin:'Meme Coins',arbitrage:'Arbitragem DEX',scalping:'Scalping Tokens',leverage:'Leverage Trading'};
+    const nameMap={sniper:'Sniping Pump.fun',memecoin:'Meme Coins',arbitrage:'Arbitragem DEX',scalping:'Scalping Tokens',leverage:'Leverage Trading',whale:'Whale Tracking'};
     const phaseMap={aprendendo:'APRENDENDO',analisando:'ANALISANDO',otimizando:'OTIMIZANDO',confiante:'CONFIANTE'};
     const phaseColor={aprendendo:'var(--yellow)',analisando:'var(--text-muted)',otimizando:'var(--purple)',confiante:'var(--green)'};
     let html='';
@@ -1524,7 +1576,7 @@ function renderAgentsSection(){
 function showTradeHistory(stratKey){
     const a=activeAllocations[stratKey];
     if(!a)return;
-    const nameMap={sniper:'Sniping Pump.fun',memecoin:'Meme Coins',arbitrage:'Arbitragem DEX',scalping:'Scalping Tokens',leverage:'Leverage Trading'};
+    const nameMap={sniper:'Sniping Pump.fun',memecoin:'Meme Coins',arbitrage:'Arbitragem DEX',scalping:'Scalping Tokens',leverage:'Leverage Trading',whale:'Whale Tracking'};
     const history=(a.trade_history||[]).slice().reverse();
     let existing=document.getElementById('trade-history-modal');
     if(existing)existing.remove();
@@ -1917,7 +1969,7 @@ async def handle_toggle_strategy(request):
     try:
         data = await request.json()
         key = data.get("strategy", "")
-        valid_keys = ["sniper", "memecoin", "arbitrage", "scalping", "leverage"]
+        valid_keys = ["sniper", "memecoin", "arbitrage", "scalping", "leverage", "whale"]
         if key not in valid_keys:
             return web.json_response({"error": "invalid strategy"}, status=400)
         PENDING_COMMANDS.append({"action": "toggle_strategy", "strategy": key})
@@ -1936,7 +1988,7 @@ async def handle_allocate_strategy(request):
         key = data.get("strategy", "")
         amount = float(data.get("amount", 0))
         coin = data.get("coin", "SOL")
-        valid_keys = ["sniper", "memecoin", "arbitrage", "scalping", "leverage"]
+        valid_keys = ["sniper", "memecoin", "arbitrage", "scalping", "leverage", "whale"]
         if key not in valid_keys:
             return web.json_response({"error": "invalid strategy"}, status=400)
         if amount <= 0:
@@ -1977,7 +2029,7 @@ async def handle_deallocate_strategy(request):
     try:
         data = await request.json()
         key = data.get("strategy", "")
-        valid_keys = ["sniper", "memecoin", "arbitrage", "scalping", "leverage"]
+        valid_keys = ["sniper", "memecoin", "arbitrage", "scalping", "leverage", "whale"]
         if key not in valid_keys:
             return web.json_response({"error": "invalid strategy"}, status=400)
         PENDING_COMMANDS.append({
