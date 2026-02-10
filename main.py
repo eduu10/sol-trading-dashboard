@@ -512,6 +512,7 @@ class TelegramBot:
                     ("arbitrage", "Arbitragem", "🔄"),
                     ("scalping", "Scalping", "⚡"),
                     ("leverage", "Leverage", "📊"),
+                    ("whale", "Whale Track", "🐋"),
                 ]:
                     s = strats.get(key, {})
                     cap = s.get("capital", {})
@@ -738,8 +739,17 @@ class TelegramBot:
             else:
                 await self.send_message("❌ Erro ao executar trade. Verifique os logs.")
 
-        # MODO REAL: verifica posicoes abertas (TP/SL/timeout) a cada ciclo
+        # MODO REAL: agentes ajustam parametros e verificam posicoes
         if not config.PAPER_TRADING:
+            try:
+                # Agentes ajustam TP/SL/hold baseado no historico
+                tuned = self.strategies.agent_manager.apply_config_tuning(
+                    self.strategies.STRATEGY_HOLD_CONFIG,
+                    self.strategies.allocations
+                )
+                self.strategies.STRATEGY_HOLD_CONFIG.update(tuned)
+            except Exception as e:
+                logger.error(f"Agent config tuning error: {e}", exc_info=True)
             try:
                 await self._check_open_real_positions(current_price)
             except Exception as e:

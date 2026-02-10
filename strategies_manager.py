@@ -16,6 +16,7 @@ from strategy_memecoin import MemeCoinStrategy
 from strategy_arbitrage import ArbitrageStrategy
 from strategy_scalping import ScalpingStrategy
 from strategy_leverage import LeverageStrategy
+from strategy_whale import WhaleTrackingStrategy
 from strategy_agents import AgentManager
 
 logger = logging.getLogger("StrategiesManager")
@@ -24,7 +25,7 @@ logger = logging.getLogger("StrategiesManager")
 class StrategiesManager:
     """Gerencia as 5 estrategias de day trade em modo teste."""
 
-    STRATEGY_KEYS = ["sniper", "memecoin", "arbitrage", "scalping", "leverage"]
+    STRATEGY_KEYS = ["sniper", "memecoin", "arbitrage", "scalping", "leverage", "whale"]
 
     # TP/SL/Hold config para MODO REAL por estrategia
     STRATEGY_HOLD_CONFIG = {
@@ -68,6 +69,14 @@ class StrategiesManager:
             "leverage": 5,
             "instant": False,
         },
+        "whale": {
+            "tp_pct": 5.0,
+            "sl_pct": 3.0,
+            "max_hold_s": 1800,
+            "trailing_pct": 1.5,
+            "leverage": 1,
+            "instant": False,
+        },
     }
 
     def __init__(self):
@@ -76,6 +85,7 @@ class StrategiesManager:
         self.arbitrage = ArbitrageStrategy()
         self.scalping = ScalpingStrategy()
         self.leverage = LeverageStrategy()
+        self.whale = WhaleTrackingStrategy()
 
         self.strategies = [
             self.sniper,
@@ -83,6 +93,7 @@ class StrategiesManager:
             self.arbitrage,
             self.scalping,
             self.leverage,
+            self.whale,
         ]
 
         # Estado pausado por estrategia
@@ -146,6 +157,13 @@ class StrategiesManager:
                 results["leverage"] = data5
             except Exception as e:
                 logger.debug(f"Leverage sim error: {e}")
+
+        if not self.paused.get("whale"):
+            try:
+                data6 = await self.whale.simulate_whale_tracking()
+                results["whale"] = data6
+            except Exception as e:
+                logger.debug(f"Whale sim error: {e}")
 
         return results
 
@@ -439,8 +457,8 @@ class StrategiesManager:
             # Determina token e direcao do swap
             coin = alloc.get("coin", "SOL")
             direction = trade_info.get("direction", "long")
-            # Sniper, memecoin, arbitrage sao sempre long
-            if key in ("sniper", "memecoin", "arbitrage"):
+            # Sniper, memecoin, arbitrage, whale sao sempre long (compra SOL)
+            if key in ("sniper", "memecoin", "arbitrage", "whale"):
                 direction = "long"
             pnl_pct = trade_info.get("pnl_pct", 0)
             won = pnl_pct > 0
@@ -556,6 +574,13 @@ class StrategiesManager:
                     return {"token": t.get("token", "?"), "direction": t.get("direction", "?"),
                             "pnl_pct": t.get("pnl_pct", 0), "leverage": t.get("leverage", "?"),
                             "status": t.get("status", "?")}
+            elif key == "whale":
+                recent = data.get("recent_trades", [])
+                if recent:
+                    t = recent[-1]
+                    return {"name": t.get("whale", "?"), "direction": t.get("direction", "long"),
+                            "pnl_pct": t.get("pnl_pct", 0), "status": t.get("status", "?"),
+                            "move_type": t.get("move_type", "?")}
         except Exception:
             pass
         return None
@@ -575,6 +600,7 @@ class StrategiesManager:
             "arbitrage": self.arbitrage.get_dashboard_data(),
             "scalping": self.scalping.get_dashboard_data(),
             "leverage": self.leverage.get_dashboard_data(),
+            "whale": self.whale.get_dashboard_data(),
         }
         # Adiciona estado pausado a cada estrategia
         for key in self.STRATEGY_KEYS:

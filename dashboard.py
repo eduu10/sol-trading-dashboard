@@ -1099,6 +1099,15 @@ DASHBOARD_HTML = r"""
             <div class="strategies-grid" id="real-strategies-grid">
             </div>
         </div>
+        <div class="strategies-section" id="agents-section" style="display:none">
+            <div class="strategies-title-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--purple)"><path d="M12 2a4 4 0 014 4v1a2 2 0 012 2v1a2 2 0 01-2 2H8a2 2 0 01-2-2V9a2 2 0 012-2V6a4 4 0 014-4z"/><path d="M9 18h6M10 22h4M12 14v4"/></svg>
+                <span class="strategies-title">Agentes IA</span>
+                <span class="strategies-subtitle" style="background:rgba(138,43,226,0.08);border-color:rgba(138,43,226,0.15);color:var(--purple)">ADAPTATIVO</span>
+            </div>
+            <div class="strategies-grid" id="agents-grid">
+            </div>
+        </div>
 
         <!-- Row 4: Log -->
         <div class="card log-card">
@@ -1398,7 +1407,7 @@ function updateDashboard(data) {
     }
     if(data.allocations){updateAllocationsFromData(data.allocations);}
     if(data.real_positions!==undefined){realPositions={};for(const p of data.real_positions){realPositions[p.strategy]=p;}renderRealModeSection();}
-    if(data.agents!==undefined){agentsData={};for(const a of data.agents){agentsData[a.strategy]=a;}renderRealModeSection();}
+    if(data.agents!==undefined){agentsData={};for(const a of data.agents){agentsData[a.strategy]=a;}renderRealModeSection();renderAgentsSection();}
 
     // Strategies
     if(data.strategies){updateStrategies(data.strategies);}
@@ -1611,6 +1620,88 @@ function renderRealModeSection(){
                 <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> Parar Modo Real
             </button>
         </div>`;
+    }
+    if(grid.innerHTML!==html)grid.innerHTML=html;
+}
+function renderAgentsSection(){
+    const section=document.getElementById('agents-section');
+    const grid=document.getElementById('agents-grid');
+    if(!section||!grid)return;
+    const keys=Object.keys(agentsData);
+    if(keys.length===0){section.style.display='none';return;}
+    section.style.display='';
+    const nameMap={sniper:'Sniping Pump.fun',memecoin:'Meme Coins',arbitrage:'Arbitragem DEX',scalping:'Scalping Tokens',leverage:'Leverage Trading'};
+    const phaseMap={aprendendo:'APRENDENDO',analisando:'ANALISANDO',otimizando:'OTIMIZANDO',confiante:'CONFIANTE'};
+    const phaseColor={aprendendo:'var(--yellow)',analisando:'var(--text-muted)',otimizando:'var(--purple)',confiante:'var(--green)'};
+    let html='';
+    for(const k of keys){
+        const ag=agentsData[k];
+        if(!ag)continue;
+        const an=ag.analysis||{};
+        const confPct=Math.round((ag.confidence||0)*100);
+        const confColor=confPct>=60?'var(--green)':confPct>=40?'var(--yellow)':'var(--red)';
+        const phase=ag.phase||'aprendendo';
+        const wr=an.win_rate||0;
+        const wrColor=wr>=55?'var(--green)':wr>=45?'var(--yellow)':'var(--red)';
+        const pf=an.profit_factor||0;
+        const pfColor=pf>=1.5?'var(--green)':pf>=1.0?'var(--yellow)':'var(--red)';
+        const sk=ag.streak||0;
+        const skStr=sk>0?'+'+sk:sk<0?sk.toString():'0';
+        const skColor=sk>0?'var(--green)':sk<0?'var(--red)':'var(--text-muted)';
+        const totalPnl=an.total_pnl||0;
+        const pnlColor=totalPnl>0?'var(--green)':totalPnl<0?'var(--red)':'var(--text-muted)';
+        const thoughts=ag.thoughts||[];
+        let thoughtsHtml='';
+        if(thoughts.length>0){
+            thoughtsHtml='<div style="margin-top:8px;max-height:120px;overflow-y:auto;font-size:0.7em;line-height:1.5;color:var(--text-secondary);">';
+            for(const t of thoughts){thoughtsHtml+='<div style="padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03);">'+t+'</div>';}
+            thoughtsHtml+='</div>';
+        }
+        const mods=ag.config_mods||{};
+        const modKeys=Object.keys(mods);
+        let modsHtml='';
+        if(modKeys.length>0){
+            modsHtml='<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">';
+            for(const mk of modKeys){modsHtml+='<span style="background:rgba(138,43,226,0.1);border:1px solid rgba(138,43,226,0.2);border-radius:4px;padding:2px 6px;font-size:0.65em;color:var(--purple);">'+mk+': '+mods[mk]+'</span>';}
+            modsHtml+='</div>';
+        }
+        const adjHist=ag.adjustment_history||[];
+        let adjHtml='';
+        if(adjHist.length>0){
+            const last3=adjHist.slice(-3);
+            adjHtml='<div style="margin-top:6px;font-size:0.65em;color:var(--text-muted);">';
+            for(const adj of last3){const d=new Date((adj.time||0)*1000);const dt=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});adjHtml+='<div style="padding:2px 0;">'+dt+' '+adj.param+': '+adj.old+' -> '+adj.new+'</div>';}
+            adjHtml+='</div>';
+        }
+        const bestSigs=an.best_signals||[];
+        let sigsHtml='';
+        if(bestSigs.length>0){
+            sigsHtml='<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:3px;">';
+            for(const s of bestSigs.slice(0,3)){const color=s[1]>0?'var(--green)':'var(--red)';sigsHtml+='<span style="background:rgba(255,255,255,0.03);border-radius:3px;padding:1px 5px;font-size:0.6em;"><span style="color:var(--text-muted);">'+s[0]+'</span> <span style="color:'+color+';">$'+s[1].toFixed(4)+'</span></span>';}
+            sigsHtml+='</div>';
+        }
+        html+='<div class="strat-card" style="border-color:rgba(138,43,226,0.2);">';
+        html+='<div class="strat-header"><div class="strat-name">'+(nameMap[k]||k)+'</div><span class="strat-badge" style="background:rgba(138,43,226,0.15);color:var(--purple);font-size:0.65em;">AGENTE</span></div>';
+        html+='<div style="display:flex;align-items:center;gap:8px;margin:8px 0;"><span style="font-size:0.7em;color:'+(phaseColor[phase]||'var(--text-muted)')+';font-weight:700;text-transform:uppercase;letter-spacing:1px;">'+(phaseMap[phase]||phase)+'</span><div style="flex:1;height:6px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+confPct+'%;background:'+confColor+';border-radius:3px;transition:width 0.5s;"></div></div><span style="font-size:0.85em;font-weight:700;color:'+confColor+';">'+confPct+'%</span></div>';
+        html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:8px 0;">';
+        html+='<div style="text-align:center;"><div style="font-size:0.6em;color:var(--text-muted);text-transform:uppercase;">Win Rate</div><div style="font-size:0.9em;font-weight:700;color:'+wrColor+';">'+wr.toFixed(1)+'%</div></div>';
+        html+='<div style="text-align:center;"><div style="font-size:0.6em;color:var(--text-muted);text-transform:uppercase;">P. Factor</div><div style="font-size:0.9em;font-weight:700;color:'+pfColor+';">'+pf.toFixed(1)+'x</div></div>';
+        html+='<div style="text-align:center;"><div style="font-size:0.6em;color:var(--text-muted);text-transform:uppercase;">Streak</div><div style="font-size:0.9em;font-weight:700;color:'+skColor+';">'+skStr+'</div></div>';
+        html+='</div>';
+        html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:4px 0;">';
+        html+='<div style="text-align:center;"><div style="font-size:0.6em;color:var(--text-muted);">Trades</div><div style="font-size:0.8em;font-weight:600;">'+(an.trades||0)+'</div></div>';
+        html+='<div style="text-align:center;"><div style="font-size:0.6em;color:var(--green);">Aprovados</div><div style="font-size:0.8em;font-weight:600;color:var(--green);">'+(ag.approved||0)+'</div></div>';
+        html+='<div style="text-align:center;"><div style="font-size:0.6em;color:var(--red);">Rejeitados</div><div style="font-size:0.8em;font-weight:600;color:var(--red);">'+(ag.rejected||0)+'</div></div>';
+        html+='</div>';
+        html+=modsHtml;
+        html+=sigsHtml;
+        if(thoughts.length>0){
+            html+='<div style="margin-top:10px;border-top:1px solid rgba(138,43,226,0.1);padding-top:8px;"><div style="font-size:0.65em;color:var(--purple);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Pensamentos do Agente</div>'+thoughtsHtml+'</div>';
+        }
+        if(adjHist.length>0){
+            html+='<div style="margin-top:6px;border-top:1px solid rgba(138,43,226,0.1);padding-top:6px;"><div style="font-size:0.65em;color:var(--purple);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Ultimos Ajustes</div>'+adjHtml+'</div>';
+        }
+        html+='</div>';
     }
     if(grid.innerHTML!==html)grid.innerHTML=html;
 }
